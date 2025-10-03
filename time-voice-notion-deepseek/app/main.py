@@ -10,6 +10,7 @@ import yaml
 
 from .llm_parser import parse_with_deepseek, LLMParseError
 from .notion_client import create_time_entry, NotionError
+from .scheduler import start_scheduler, stop_scheduler, run_manual_stats
 
 app = FastAPI(title="Voice → Notion Time Logger (DeepSeek)", version="2.0.0")
 
@@ -34,6 +35,33 @@ class IngestBody(BaseModel):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+@app.post("/stats/start")
+def start_stats_scheduler():
+    """启动定时统计任务"""
+    try:
+        start_scheduler()
+        return {"ok": True, "message": "定时统计任务已启动"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"启动定时任务失败: {str(e)}")
+
+@app.post("/stats/stop")
+def stop_stats_scheduler():
+    """停止定时统计任务"""
+    try:
+        stop_scheduler()
+        return {"ok": True, "message": "定时统计任务已停止"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"停止定时任务失败: {str(e)}")
+
+@app.post("/stats/run-manual")
+def run_manual_stats_endpoint():
+    """手动运行一次统计（用于测试）"""
+    try:
+        run_manual_stats()
+        return {"ok": True, "message": "手动统计任务已执行"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"执行手动统计失败: {str(e)}")
 
 @app.post("/ingest")
 def ingest(body: IngestBody):

@@ -2,8 +2,8 @@
 from __future__ import annotations
 import os
 import requests
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Dict, Any
+from datetime import datetime, date, timedelta
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "")
@@ -56,3 +56,63 @@ def create_time_entry(
             detail = r.text
         raise NotionError(f"Notion API error {r.status_code}: {detail}")
     return r.json()
+
+def query_time_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
+    """查询指定日期范围内的所有时间条目"""
+    if not NOTION_DATABASE_ID:
+        raise NotionError("NOTION_DATABASE_ID env var is missing.")
+    
+    # 构建查询过滤器
+    filter_data = {
+        "and": [
+            {
+                "property": "When",
+                "date": {
+                    "on_or_after": start_date.isoformat()
+                }
+            },
+            {
+                "property": "When",
+                "date": {
+                    "on_or_before": end_date.isoformat()
+                }
+            }
+        ]
+    }
+    
+    payload = {
+        "filter": filter_data,
+        "sorts": [
+            {
+                "property": "When",
+                "direction": "ascending"
+            }
+        ]
+    }
+    
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
+        headers=_headers(),
+        json=payload,
+        timeout=20
+    )
+    
+    if r.status_code >= 300:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    
+    result = r.json()
+    return result.get("results", [])
+
+def get_today_entries() -> List[Dict[str, Any]]:
+    """获取今天的所有时间条目"""
+    today = date.today()
+    return query_time_entries(today, today)
+
+def get_yesterday_entries() -> List[Dict[str, Any]]:
+    """获取昨天的所有时间条目"""
+    yesterday = date.today() - timedelta(days=1)
+    return query_time_entries(yesterday, yesterday)
