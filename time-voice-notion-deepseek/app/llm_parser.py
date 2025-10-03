@@ -32,7 +32,7 @@ def _chat_completions(payload: Dict[str, Any]) -> Dict[str, Any]:
     return r.json()
 
 def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
-    cats = categories or ["深度工作","会议","沟通","家庭","运动","学习","杂项"]
+    cats = categories or ["工作","放松","睡觉","运动","学习","杂项"]
     tools = [{
         "type": "function",
         "function": {
