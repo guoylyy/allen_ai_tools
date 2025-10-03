@@ -40,8 +40,10 @@ def ingest(body: IngestBody):
     try:
         now = datetime.fromisoformat(body.now) if body.now else datetime.now()
         cats = []
+        tags = []
         if CATEGORY_MAPPING:
             cats = [v.get('category_name', k) for k, v in CATEGORY_MAPPING.items()]
+            tags = [v.get('tag_name', k) for k, v in CATEGORY_MAPPING.items()]  
         parsed = parse_with_deepseek(body.utterance, now=now, tz=body.tz or DEFAULT_TZ, categories=cats or None)
         activity = parsed.get('activity') or '未命名活动'
         start = datetime.fromisoformat(parsed['start_iso'])

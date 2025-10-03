@@ -31,7 +31,7 @@ def _chat_completions(payload: Dict[str, Any]) -> Dict[str, Any]:
         raise LLMParseError(f"DeepSeek API error {r.status_code}: {detail}")
     return r.json()
 
-def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None) -> Dict[str, Any]:
+def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
     cats = categories or ["深度工作","会议","沟通","家庭","运动","学习","杂项"]
     tools = [{
         "type": "function",
@@ -45,7 +45,7 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
                     "start_iso": {"type":"string","description":"起始时间，ISO-8601（含时区），例：2025-10-03T09:00:00+08:00"},
                     "end_iso": {"type":"string","description":"结束时间，ISO-8601（含时区），例：2025-10-03T10:00:00+08:00"},
                     "activity": {"type":"string","description":"活动内容，保留动词短语即可"},
-                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则空数组"},
+                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则从候选集合中选取一个最合适的标签，不允许为空","enum": tags or []},
                     "mentions": {"type":"array","items":{"type":"string"},"description":"从 @提及 中提取，无则空数组"},
                     "category": {"type":"string","description":"归类名，必须从候选集中选择一个最合适的分类，不允许为空","enum": cats},
                     "confidence": {"type":"number","description":"0-1 置信度","minimum":0,"maximum":1},
