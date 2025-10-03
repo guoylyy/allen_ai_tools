@@ -47,9 +47,9 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
                     "activity": {"type":"string","description":"活动内容，保留动词短语即可"},
                     "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则空数组"},
                     "mentions": {"type":"array","items":{"type":"string"},"description":"从 @提及 中提取，无则空数组"},
-                    "category": {"type":"string","description":"归类名，如不确定可为空字符串或从候选集中选择","enum": cats + [""]},
+                    "category": {"type":"string","description":"归类名，必须从候选集中选择一个最合适的分类，不允许为空","enum": cats},
                     "confidence": {"type":"number","description":"0-1 置信度","minimum":0,"maximum":1},
-                    "assumptions": {"type":"array","items":{"type":"string"},"description":"解析过程中的假设/补全，如“仅给出开始时间，结束按当前时间补齐”等"}
+                    "assumptions": {"type":"array","items":{"type":"string"},"description":"解析过程中的假设/补全，如\"仅给出开始时间，结束按当前时间补齐\"等"}
                 },
                 "required": ["start_iso","end_iso","activity","tags","mentions","category","confidence","assumptions"],
                 "additionalProperties": False
@@ -58,16 +58,16 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
     }]
 
     sys = f"""
-你是一个“时间记录解析器”。任务：把用户的一句中文口语解析为结构化字段，并**仅**通过 function calling 输出，不要自然语言回答。
+你是一个"时间记录解析器"。任务：把用户的一句中文口语解析为结构化字段，并**仅**通过 function calling 输出，不要自然语言回答。
 
 规则：
-1) 解析中文时间短语，支持“9点到10点、10点半到现在、昨天晚上、上午/下午/晚上、刚才、昨晚23:10-0:40”等；
-2) 只给一个时间点时，另一端按“当前时间”补齐；
+1) 解析中文时间短语，支持"9点到10点、10点半到现在、昨天晚上、上午/下午/晚上、刚才、昨晚23:10-0:40"等；
+2) 只给一个时间点时，另一端按"当前时间"补齐；
 3) 若出现跨日或顺序颠倒，确保 start_iso <= end_iso；
-4) 必须输出 **ISO-8601 含时区**，时区以“当前时区”为准；
-5) 若无明确活动文案，activity 用“未命名活动”；
+4) 必须输出 **ISO-8601 含时区**，时区以"当前时区"为准；
+5) 若无明确活动文案，activity 用"未命名活动"；
 6) 从文本中抽取 #标签 到 tags，@提及 到 mentions；
-7) 尽量归到给定的类别集合；
+7) **必须从给定的类别集合中选择一个最合适的分类，不允许为空**；
 8) 任何推断或默认值写入 assumptions；
 9) 仅通过工具 extract_time_log 返回，不要普通文本。
 
