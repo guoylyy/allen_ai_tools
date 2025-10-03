@@ -1,0 +1,4 @@
+POST http://localhost:8000/ingest
+Content-Type: application/json
+
+{"utterance":"10点半到现在 回邮件 #沟通","source":"httpie"}

@@ -1,0 +1,21 @@
+deep_work:
+  category_name: 深度工作
+  keywords: [写代码, 写方案, 写合同, 设计, 调研]
+meeting:
+  category_name: 会议
+  keywords: [开会, 例会, 复盘]
+communication:
+  category_name: 沟通
+  keywords: [回消息, 打电话, 邮件]
+family:
+  category_name: 家庭
+  keywords: [带娃, 做饭, 采购]
+exercise:
+  category_name: 运动
+  keywords: [跑步, 健身, 瑜伽]
+learn:
+  category_name: 学习
+  keywords: [学习, 读书, 上课]
+misc:
+  category_name: 杂项
+  keywords: [其它]
