@@ -1,21 +1,18 @@
 deep_work:
-  category_name: 深度工作
-  keywords: [写代码, 写方案, 写合同, 设计, 调研]
-meeting:
-  category_name: 会议
-  keywords: [开会, 例会, 复盘]
+  category_name: 工作
+  keywords: [写代码, 调研, 生产, 销售, 投资, 组织, 管理, 规划, 分析, 写作, 沟通]
 communication:
-  category_name: 沟通
-  keywords: [回消息, 打电话, 邮件]
+  category_name: 放松
+  keywords: [看电影, 看剧, 看综艺, 打游戏, 听音乐, 听播客, 逛街, 旅游, 聚会, 聊天, 约会, KTV, 喝酒, 扑克]
 family:
-  category_name: 家庭
-  keywords: [带娃, 做饭, 采购]
+  category_name: 睡觉
+  keywords: [睡眠, 休息, 午休, 午睡, 睡觉]
 exercise:
   category_name: 运动
-  keywords: [跑步, 健身, 瑜伽]
+  keywords: [跑步, 健身, 瑜伽, 打球, 游泳, 骑行, 徒步, 健身房]
 learn:
   category_name: 学习
-  keywords: [学习, 读书, 上课]
+  keywords: [学习, 读书, 上课, 听课, 复习, 总结]
 misc:
   category_name: 杂项
-  keywords: [其它]
+  keywords: [其它，交通, 通勤, 开车, 吃饭, 做饭, 购物, 个人护理, 医疗, 看病, 理发,  电话]
