@@ -116,3 +116,46 @@ def get_yesterday_entries() -> List[Dict[str, Any]]:
     """获取昨天的所有时间条目"""
     yesterday = date.today() - timedelta(days=1)
     return query_time_entries(yesterday, yesterday)
+
+def create_expense_entry(
+    content: str,
+    amount: float,
+    category: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    expense_date: Optional[datetime] = None,
+    notes: Optional[str] = None,
+):
+    """创建花销记录条目"""
+    if not NOTION_DATABASE_ID:
+        raise NotionError("NOTION_DATABASE_ID env var is missing.")
+    
+    # 如果没有提供日期，使用当前日期
+    if expense_date is None:
+        expense_date = datetime.now()
+    
+    props = {
+        "Content": {"title": [{"text": {"content": content[:2000]}}]},
+        "Amount": {"number": amount},
+        "Date": {"date": {"start": expense_date.date().isoformat()}},
+    }
+    
+    if category:
+        props["Category"] = {"select": {"name": category}}
+    if tags:
+        props["Tags"] = {"multi_select": [{"name": t} for t in tags[:50]]}
+    if notes:
+        props["Notes"] = {"rich_text": [{"text": {"content": notes[:2000]}}]}
+    
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID},
+        "properties": props,
+    }
+    
+    r = requests.post("https://api.notion.com/v1/pages", headers=_headers(), json=payload, timeout=20)
+    if r.status_code >= 300:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    return r.json()

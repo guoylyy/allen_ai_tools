@@ -103,3 +103,71 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
         if k not in parsed:
             raise LLMParseError(f"Missing key in function args: {k}")
     return parsed
+
+def parse_expense_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
+    """解析花销内容，自动识别金额、分类等"""
+    cats = categories or ["餐饮", "交通", "购物", "娱乐", "医疗", "教育", "住房", "其他"]
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "extract_expense_log",
+            "strict": True,
+            "description": "从中文口语的一句话里抽取花销记录字段，自动识别金额和分类。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "content": {"type":"string","description":"花销内容描述，如'午餐'、'打车'、'买书'等"},
+                    "amount": {"type":"number","description":"金额，必须是数字"},
+                    "category": {"type":"string","description":"分类名，必须从候选集中选择一个最合适的分类，不允许为空","enum": cats},
+                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则空数组","enum": tags or []},
+                    "confidence": {"type":"number","description":"0-1 置信度","minimum":0,"maximum":1},
+                    "assumptions": {"type":"array","items":{"type":"string"},"description":"解析过程中的假设/补全，如\"从上下文推断金额\"等"}
+                },
+                "required": ["content","amount","category","tags","confidence","assumptions"],
+                "additionalProperties": False
+            }
+        }
+    }]
+
+    sys = f"""
+你是一个"花销记录解析器"。任务：把用户的一句中文口语解析为结构化花销字段，并**仅**通过 function calling 输出，不要自然语言回答。
+
+规则：
+1) 从文本中识别金额数字，支持"花了50元、买了30块钱的书、打车花了15.5元"等表达；
+2) 必须从给定的类别集合中选择一个最合适的分类，不允许为空；
+3) 从文本中抽取 #标签 到 tags；
+4) 任何推断或默认值写入 assumptions；
+5) 仅通过工具 extract_expense_log 返回，不要普通文本。
+
+当前时间: {now.isoformat()}
+当前时区: {tz}
+"""
+    user = f"原始口述：{utterance}\n请抽取并返回函数参数。"
+
+    payload = {
+        "model": DEEPSEEK_MODEL,
+        "messages": [
+            {"role":"system","content":sys},
+            {"role":"user","content":user}
+        ],
+        "tools": tools,
+        "tool_choice": {"type":"function","function":{"name":"extract_expense_log"}},
+        "temperature": 0.2,
+        "max_tokens": 400
+    }
+    data = _chat_completions(payload)
+    choice = data.get("choices",[{}])[0]
+    msg = choice.get("message",{})
+    tool_calls = msg.get("tool_calls") or []
+    if not tool_calls:
+        raise LLMParseError("Model did not return a tool call.")
+    func = tool_calls[0]["function"]
+    args = func.get("arguments","{}")
+    try:
+        parsed = json.loads(args)
+    except Exception as e:
+        raise LLMParseError(f"Invalid JSON from function call: {e}; raw={args[:500]}")
+    for k in ["content","amount","category","tags","confidence","assumptions"]:
+        if k not in parsed:
+            raise LLMParseError(f"Missing key in function args: {k}")
+    return parsed

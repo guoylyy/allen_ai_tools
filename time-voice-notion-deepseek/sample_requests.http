@@ -2,3 +2,9 @@ POST http://localhost:8000/ingest
 Content-Type: application/json
 
 {"utterance":"10点半到现在 回邮件 #沟通","source":"httpie"}
+
+### 花销记录API
+POST http://localhost:8000/expense
+Content-Type: application/json
+
+{"utterance":"午餐花了50元 #餐饮","source":"httpie"}

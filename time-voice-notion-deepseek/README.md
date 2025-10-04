@@ -8,11 +8,16 @@
 ---
 
 ## 一、准备 Notion 数据库（一次性）
+
+### 时间记录数据库
 建表字段：**Activity(Title)**、**When(Date)**、**Category(Select)**、**Tags(Multi-select)**、**Notes(Rich text)**。
 可选公式列 **Duration (h)**：
 ```
 round(dateBetween(end(prop("When")), start(prop("When")), "minutes") / 60, 2)
 ```
+
+### 花销记录数据库
+建表字段：**Content(Title)**、**Amount(Number)**、**Date(Date)**、**Category(Select)**、**Tags(Multi-select)**、**Notes(Rich text)**。
 
 ---
 
@@ -41,18 +46,28 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ---
 
 ## 三、Android（小米）语音上送（Tasker）
-Tasker 任务：
-1) **Input → Get Voice**（提示“9点到10点 写合同 #工作”），结果变量 `%VOICE`  
+
+### 时间记录任务：
+1) **Input → Get Voice**（提示"9点到10点 写合同 #工作"），结果变量 `%VOICE`  
 2) **Net → HTTP Request (POST)** 到 `http://服务器IP:8000/ingest`，Body：
 ```json
 {"utterance":"%VOICE","source":"tasker"}
 ```
 3) （可选）提示结果。小米需放开自启动、后台限制、麦克风权限。
 
+### 花销记录任务：
+1) **Input → Get Voice**（提示"午餐花了50元 #餐饮"），结果变量 `%VOICE`  
+2) **Net → HTTP Request (POST)** 到 `http://服务器IP:8000/expense`，Body：
+```json
+{"utterance":"%VOICE","source":"tasker"}
+```
+3) （可选）提示结果。
+
 ---
 
 ## 四、接口
-- `POST /ingest` → 主入口；返回解析后的字段与 Notion URL。
+- `POST /ingest` → 时间记录主入口；返回解析后的字段与 Notion URL。
+- `POST /expense` → 花销记录主入口；返回解析后的字段与 Notion URL。
 
 ---
 

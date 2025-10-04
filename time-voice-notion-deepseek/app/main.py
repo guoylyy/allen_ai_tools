@@ -8,8 +8,8 @@ from typing import Optional
 from datetime import datetime
 import yaml
 
-from .llm_parser import parse_with_deepseek, LLMParseError
-from .notion_client import create_time_entry, NotionError
+from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, LLMParseError
+from .notion_client import create_time_entry, create_expense_entry, NotionError
 from .scheduler import start_scheduler, stop_scheduler, run_manual_stats
 
 app = FastAPI(title="Voice → Notion Time Logger (DeepSeek)", version="2.0.0")
@@ -97,6 +97,64 @@ def ingest(body: IngestBody):
                 "category": category,
                 "tags": tags,
                 "mentions": mentions,
+            },
+            "notion_page_id": created.get("id"),
+            "notion_url": created.get("url"),
+        }
+    except LLMParseError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except NotionError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ExpenseBody(BaseModel):
+    utterance: str = Field(..., description="e.g., '午餐花了50元 #餐饮'")
+    tz: Optional[str] = Field(default=DEFAULT_TZ, description="IANA timezone, e.g., Asia/Shanghai")
+    source: Optional[str] = None
+    now: Optional[str] = Field(default=None, description="Override current time (ISO 8601)")
+
+@app.post("/expense")
+def expense(body: ExpenseBody):
+    """记录花销"""
+    try:
+        now = datetime.fromisoformat(body.now) if body.now else datetime.now()
+        
+        # 花销分类映射，可以扩展
+        expense_categories = ["餐饮", "交通", "购物", "娱乐", "医疗", "教育", "住房", "其他"]
+        expense_tags = ["日常", "必要", "非必要", "大额", "小额"]
+        
+        parsed = parse_expense_with_deepseek(
+            body.utterance, 
+            now=now, 
+            tz=body.tz or DEFAULT_TZ, 
+            categories=expense_categories,
+            tags=expense_tags
+        )
+        
+        content = parsed.get('content') or '未命名花销'
+        amount = parsed.get('amount') or 0.0
+        category = parsed.get('category') or '其他'
+        tags = parsed.get('tags') or []
+        
+        notes = f"source={body.source or ''}; raw={body.utterance}; assumptions={'; '.join(parsed.get('assumptions') or [])}; confidence={parsed.get('confidence')}"
+        
+        created = create_expense_entry(
+            content=content,
+            amount=amount,
+            category=category,
+            tags=tags,
+            expense_date=now,
+            notes=notes,
+        )
+        
+        return {
+            "ok": True,
+            "parsed": {
+                "content": content,
+                "amount": amount,
+                "category": category,
+                "tags": tags,
             },
             "notion_page_id": created.get("id"),
             "notion_url": created.get("url"),
