@@ -7,6 +7,7 @@ from datetime import datetime, date, timedelta
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "")
+NOTION_DATABASE_ID2 = os.environ.get("NOTION_DATABASE_ID2", "")
 NOTION_VERSION = "2022-06-28"
 
 class NotionError(Exception):
@@ -126,8 +127,8 @@ def create_expense_entry(
     notes: Optional[str] = None,
 ):
     """创建花销记录条目"""
-    if not NOTION_DATABASE_ID:
-        raise NotionError("NOTION_DATABASE_ID env var is missing.")
+    if not NOTION_DATABASE_ID2:
+        raise NotionError("NOTION_DATABASE_ID2 env var is missing.")
     
     # 如果没有提供日期，使用当前日期
     if expense_date is None:
@@ -147,7 +148,7 @@ def create_expense_entry(
         props["Notes"] = {"rich_text": [{"text": {"content": notes[:2000]}}]}
     
     payload = {
-        "parent": {"database_id": NOTION_DATABASE_ID},
+        "parent": {"database_id": NOTION_DATABASE_ID2},
         "properties": props,
     }
     

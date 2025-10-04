@@ -121,8 +121,8 @@ def expense(body: ExpenseBody):
         now = datetime.fromisoformat(body.now) if body.now else datetime.now()
         
         # 花销分类映射，可以扩展
-        expense_categories = ["餐饮", "交通", "购物", "娱乐", "医疗", "教育", "住房", "其他"]
-        expense_tags = ["日常", "必要", "非必要", "大额", "小额"]
+        expense_categories = ["餐饮", "交通", "购物", "娱乐", "医疗", "学习", "住房", "其他", "工作"]
+        expense_tags = ["日常", "必要", "非必要"]
         
         parsed = parse_expense_with_deepseek(
             body.utterance, 

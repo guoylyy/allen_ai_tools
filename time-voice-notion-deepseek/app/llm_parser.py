@@ -106,7 +106,7 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
 
 def parse_expense_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
     """解析花销内容，自动识别金额、分类等"""
-    cats = categories or ["餐饮", "交通", "购物", "娱乐", "医疗", "教育", "住房", "其他"]
+    cats = categories or ["餐饮", "交通", "购物", "娱乐", "医疗", "学习", "住房", "其他",  "工作"]
     tools = [{
         "type": "function",
         "function": {
@@ -119,7 +119,7 @@ def parse_expense_with_deepseek(utterance: str, now: datetime, tz: str, categori
                     "content": {"type":"string","description":"花销内容描述，如'午餐'、'打车'、'买书'等"},
                     "amount": {"type":"number","description":"金额，必须是数字"},
                     "category": {"type":"string","description":"分类名，必须从候选集中选择一个最合适的分类，不允许为空","enum": cats},
-                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则空数组","enum": tags or []},
+                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则从候选集合中选取一个最合适的标签，不允许为空","enum": tags or []},
                     "confidence": {"type":"number","description":"0-1 置信度","minimum":0,"maximum":1},
                     "assumptions": {"type":"array","items":{"type":"string"},"description":"解析过程中的假设/补全，如\"从上下文推断金额\"等"}
                 },
