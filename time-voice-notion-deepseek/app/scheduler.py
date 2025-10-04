@@ -29,8 +29,8 @@ class DailyStatsScheduler:
         """设置定时任务"""
         # 每天00:05执行，统计昨天的数据
         trigger = CronTrigger(
-            hour=6,
-            minute=0,
+            hour=8,
+            minute=1,
             timezone="Asia/Shanghai"
         )
         
@@ -42,7 +42,7 @@ class DailyStatsScheduler:
             replace_existing=True
         )
         
-        logger.info("定时任务已设置：每天6:00执行")
+        logger.info("定时任务已设置：每天8:00执行")
     
     def send_to_feishu(self, report: str):
         """通过飞书机器人发送报告"""
