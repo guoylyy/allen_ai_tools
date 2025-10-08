@@ -4,6 +4,7 @@ import os
 import requests
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta
+import pytz
 
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "")
@@ -63,19 +64,37 @@ def query_time_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]
     if not NOTION_DATABASE_ID:
         raise NotionError("NOTION_DATABASE_ID env var is missing.")
     
-    # 构建查询过滤器
+    # 将东八区日期转换为UTC时间进行查询
+    # 东八区比UTC快8小时，所以东八区的00:00对应UTC的前一天16:00
+    # 东八区的23:59对应UTC的当天15:59
+    shanghai_tz = pytz.timezone('Asia/Shanghai')
+    utc_tz = pytz.UTC
+    
+    # 将开始日期的00:00转换为UTC时间
+    start_datetime_sh = shanghai_tz.localize(
+        datetime.combine(start_date, datetime.min.time())
+    )
+    start_datetime_utc = start_datetime_sh.astimezone(utc_tz)
+    
+    # 将结束日期的23:59:59转换为UTC时间
+    end_datetime_sh = shanghai_tz.localize(
+        datetime.combine(end_date, datetime.max.time().replace(hour=23, minute=59, second=59))
+    )
+    end_datetime_utc = end_datetime_sh.astimezone(utc_tz)
+    
+    # 构建查询过滤器，使用UTC时间
     filter_data = {
         "and": [
             {
                 "property": "When",
                 "date": {
-                    "on_or_after": start_date.isoformat()
+                    "on_or_after": start_datetime_utc.isoformat()
                 }
             },
             {
                 "property": "When",
                 "date": {
-                    "on_or_before": end_date.isoformat()
+                    "on_or_before": end_datetime_utc.isoformat()
                 }
             }
         ]
@@ -109,12 +128,12 @@ def query_time_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]
     return result.get("results", [])
 
 def get_today_entries() -> List[Dict[str, Any]]:
-    """获取今天的所有时间条目"""
+    """获取今天的所有时间条目（基于东八区时间）"""
     today = date.today()
     return query_time_entries(today, today)
 
 def get_yesterday_entries() -> List[Dict[str, Any]]:
-    """获取昨天的所有时间条目"""
+    """获取昨天的所有时间条目（基于东八区时间）"""
     yesterday = date.today() - timedelta(days=1)
     return query_time_entries(yesterday, yesterday)
 
