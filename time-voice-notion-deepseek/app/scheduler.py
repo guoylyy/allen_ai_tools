@@ -124,10 +124,65 @@ class DailyStatsScheduler:
             self.scheduler.shutdown()
             logger.info("定时任务已停止")
     
-    def run_manual(self):
-        """手动运行一次统计（用于测试）"""
+    def run_manual(self, start_date: str = None, end_date: str = None):
+        """手动运行一次统计（用于测试）
+        
+        Args:
+            start_date: 开始日期 (YYYY-MM-DD格式)
+            end_date: 结束日期 (YYYY-MM-DD格式)
+        """
         logger.info("手动执行统计任务...")
-        self.generate_daily_stats()
+        if start_date and end_date:
+            self.generate_date_range_stats(start_date, end_date)
+        else:
+            self.generate_daily_stats()
+    
+    def generate_date_range_stats(self, start_date: str, end_date: str):
+        """生成指定日期范围的统计数据"""
+        try:
+            from datetime import datetime, date
+            
+            # 解析日期
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+            
+            logger.info(f"开始生成 {start_date} 到 {end_date} 的统计数据...")
+            
+            # 获取指定日期范围的数据
+            from .notion_client import query_time_entries
+            entries = query_time_entries(start, end)
+            logger.info(f"获取到 {len(entries)} 条时间记录")
+            
+            if not entries:
+                logger.warning(f"{start_date} 到 {end_date} 期间没有时间记录数据")
+                no_data_message = f"📊 {start_date} 到 {end_date} 时间统计报告\n\n该期间没有记录任何时间数据。"
+                self.send_to_feishu(no_data_message)
+                return
+            
+            # 计算统计数据
+            from .stats import calculate_date_range_stats
+            stats = calculate_date_range_stats(entries, start, end)
+            
+            # 生成报告
+            from .stats import generate_date_range_report
+            report = generate_date_range_report(stats)
+            
+            # 输出报告到日志
+            logger.info(f"日期范围统计报告:\n{report}")
+            
+            # 发送到飞书机器人
+            self.send_to_feishu(report)
+            
+            logger.info("日期范围统计数据生成完成")
+            
+        except ValueError as e:
+            error_message = f"❌ 日期格式错误\n\n请使用 YYYY-MM-DD 格式，例如：2024-01-01\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"日期格式错误: {e}")
+        except Exception as e:
+            error_message = f"❌ 生成日期范围统计报告失败\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"生成日期范围统计数据时发生错误: {e}")
 
 # 全局调度器实例
 scheduler_instance = DailyStatsScheduler()
@@ -140,6 +195,11 @@ def stop_scheduler():
     """停止定时任务（供外部调用）"""
     scheduler_instance.stop()
 
-def run_manual_stats():
-    """手动运行统计（供外部调用）"""
-    scheduler_instance.run_manual()
+def run_manual_stats(start_date: str = None, end_date: str = None):
+    """手动运行统计（供外部调用）
+    
+    Args:
+        start_date: 开始日期 (YYYY-MM-DD格式)
+        end_date: 结束日期 (YYYY-MM-DD格式)
+    """
+    scheduler_instance.run_manual(start_date, end_date)

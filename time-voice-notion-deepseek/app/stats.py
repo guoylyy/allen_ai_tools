@@ -154,6 +154,130 @@ def generate_daily_report(stats: Dict[str, Any]) -> str:
     
     return "\n".join(report_lines)
 
+def calculate_date_range_stats(entries: List[Dict[str, Any]], start_date: date, end_date: date) -> Dict[str, Any]:
+    """计算日期范围统计数据"""
+    parsed_entries = [parse_notion_entry(entry) for entry in entries]
+    
+    # 按分类统计
+    category_stats = defaultdict(float)
+    category_activities = defaultdict(list)
+    
+    # 按标签统计
+    tag_stats = defaultdict(float)
+    
+    # 按日期统计
+    daily_stats = defaultdict(float)
+    
+    total_duration = 0
+    entry_count = len(parsed_entries)
+    
+    for entry in parsed_entries:
+        duration = entry["duration"]
+        category = entry["category"] or "未分类"
+        tags = entry["tags"]
+        entry_date = entry["start_time"].date() if entry["start_time"] else None
+        
+        # 分类统计
+        category_stats[category] += duration
+        category_activities[category].append({
+            "activity": entry["activity"],
+            "duration": duration,
+            "start_time": entry["start_time"]
+        })
+        
+        # 标签统计
+        for tag in tags:
+            tag_stats[tag] += duration
+        
+        # 按日期统计
+        if entry_date:
+            daily_stats[entry_date] += duration
+        
+        total_duration += duration
+    
+    # 计算分类占比
+    category_percentages = {}
+    for category, duration in category_stats.items():
+        if total_duration > 0:
+            percentage = (duration / total_duration) * 100
+            category_percentages[category] = round(percentage, 1)
+    
+    # 计算标签占比
+    tag_percentages = {}
+    for tag, duration in tag_stats.items():
+        if total_duration > 0:
+            percentage = (duration / total_duration) * 100
+            tag_percentages[tag] = round(percentage, 1)
+    
+    # 按持续时间排序
+    sorted_categories = sorted(category_stats.items(), key=lambda x: x[1], reverse=True)
+    sorted_tags = sorted(tag_stats.items(), key=lambda x: x[1], reverse=True)
+    sorted_daily = sorted(daily_stats.items(), key=lambda x: x[0])
+    
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_entries": entry_count,
+        "total_duration": round(total_duration, 2),
+        "categories": dict(sorted_categories),
+        "category_percentages": category_percentages,
+        "category_activities": dict(category_activities),
+        "tags": dict(sorted_tags),
+        "tag_percentages": tag_percentages,
+        "daily_stats": dict(sorted_daily),
+        "parsed_entries": parsed_entries
+    }
+
+def generate_date_range_report(stats: Dict[str, Any]) -> str:
+    """生成日期范围报告文本"""
+    report_lines = []
+    
+    report_lines.append(f"📊 {stats['start_date']} 到 {stats['end_date']} 时间统计报告")
+    report_lines.append("=" * 50)
+    report_lines.append(f"总条目数: {stats['total_entries']}")
+    report_lines.append(f"总时长: {stats['total_duration']} 小时")
+    report_lines.append(f"统计天数: {(stats['end_date'] - stats['start_date']).days + 1} 天")
+    report_lines.append("")
+    
+    # 分类统计
+    report_lines.append("📈 分类统计:")
+    for category, duration in stats['categories'].items():
+        percentage = stats['category_percentages'].get(category, 0)
+        report_lines.append(f"  {category}: {duration:.1f}h ({percentage}%)")
+    
+    report_lines.append("")
+    
+    # 标签统计
+    if stats['tags']:
+        report_lines.append("🏷️ 标签统计:")
+        for tag, duration in list(stats['tags'].items())[:10]:  # 只显示前10个标签
+            percentage = stats['tag_percentages'].get(tag, 0)
+            report_lines.append(f"  #{tag}: {duration:.1f}h ({percentage}%)")
+    
+    report_lines.append("")
+    
+    # 每日统计
+    if stats['daily_stats']:
+        report_lines.append("📅 每日统计:")
+        for day, duration in stats['daily_stats'].items():
+            report_lines.append(f"  {day}: {duration:.1f}h")
+    
+    report_lines.append("")
+    
+    # 详细活动列表（只显示前20条）
+    report_lines.append("📝 详细活动 (前20条):")
+    for entry in stats['parsed_entries'][:20]:
+        activity = entry['activity'][:30] + "..." if len(entry['activity']) > 30 else entry['activity']
+        start_time = entry['start_time'].strftime("%H:%M") if entry['start_time'] else "未知"
+        end_time = entry['end_time'].strftime("%H:%M") if entry['end_time'] else "未知"
+        date_str = entry['start_time'].strftime("%m-%d") if entry['start_time'] else "未知"
+        report_lines.append(f"  {date_str} {start_time}-{end_time} | {entry['duration']:.1f}h | {activity}")
+    
+    if len(stats['parsed_entries']) > 20:
+        report_lines.append(f"  ... 还有 {len(stats['parsed_entries']) - 20} 条记录")
+    
+    return "\n".join(report_lines)
+
 def generate_summary_for_notion(stats: Dict[str, Any]) -> Dict[str, Any]:
     """生成用于保存到Notion的摘要数据"""
     return {

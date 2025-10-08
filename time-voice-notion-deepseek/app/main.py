@@ -54,12 +54,19 @@ def stop_stats_scheduler():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"停止定时任务失败: {str(e)}")
 
+class RunManualStatsBody(BaseModel):
+    start_date: Optional[str] = Field(default=None, description="开始日期 (YYYY-MM-DD格式)")
+    end_date: Optional[str] = Field(default=None, description="结束日期 (YYYY-MM-DD格式)")
+
 @app.post("/stats/run-manual")
-def run_manual_stats_endpoint():
+def run_manual_stats_endpoint(body: RunManualStatsBody):
     """手动运行一次统计（用于测试）"""
     try:
-        run_manual_stats()
-        return {"ok": True, "message": "手动统计任务已执行"}
+        run_manual_stats(body.start_date, body.end_date)
+        message = "手动统计任务已执行"
+        if body.start_date and body.end_date:
+            message = f"手动统计任务已执行（{body.start_date} 到 {body.end_date}）"
+        return {"ok": True, "message": message}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"执行手动统计失败: {str(e)}")
 
