@@ -93,3 +93,6 @@ if __name__ == "__main__":
     test_query_function()
     
     print("测试完成")
+
+    yesterday = date.today() - timedelta(days=1)
+    print(f"昨天的日期是: {yesterday}")
