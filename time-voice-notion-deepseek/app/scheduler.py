@@ -7,8 +7,8 @@ from datetime import datetime, time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from .notion_client import get_yesterday_entries, get_current_month_expense_entries, NotionError
-from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report
+from .notion_client import get_yesterday_entries, get_current_month_expense_entries, get_current_month_time_entries, NotionError
+from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report, calculate_date_range_stats, generate_date_range_report
 
 # 配置日志
 logging.basicConfig(
@@ -151,7 +151,8 @@ class DailyStatsScheduler:
         if start_date and end_date:
             self.generate_date_range_stats(start_date, end_date)
         else:
-            self.generate_daily_stats()
+            # 如果开始和结束时间为空，自动统计本月的时间
+            self.generate_current_month_stats()
     
     def generate_date_range_stats(self, start_date: str, end_date: str):
         """生成指定日期范围的统计数据"""
@@ -239,6 +240,55 @@ class DailyStatsScheduler:
             error_message = f"❌ 生成当月花销统计报告失败\n\n错误: {str(e)}"
             self.send_to_feishu(error_message)
             logger.error(f"生成花销统计数据时发生错误: {e}")
+    
+    def generate_current_month_stats(self):
+        """生成当月时间统计数据"""
+        try:
+            logger.info("开始生成当月时间统计数据...")
+            
+            # 获取当月的数据
+            entries = get_current_month_time_entries()
+            logger.info(f"获取到 {len(entries)} 条时间记录")
+            
+            if not entries:
+                logger.warning("当月没有时间记录数据")
+                # 即使没有数据也发送通知
+                current_month = datetime.now().strftime('%Y年%m月')
+                no_data_message = f"📊 {current_month} 时间统计报告\n\n当月没有记录任何时间数据。"
+                self.send_to_feishu(no_data_message)
+                return
+            
+            # 计算当月第一天和最后一天
+            from datetime import date
+            today = date.today()
+            first_day = today.replace(day=1)
+            if today.month == 12:
+                last_day = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+            else:
+                last_day = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+            
+            # 计算统计数据
+            stats = calculate_date_range_stats(entries, first_day, last_day)
+            
+            # 生成报告
+            report = generate_date_range_report(stats)
+            
+            # 输出报告到日志
+            logger.info(f"当月时间统计报告:\n{report}")
+            
+            # 发送到飞书机器人
+            self.send_to_feishu(report)
+            
+            logger.info("当月时间统计数据生成完成")
+            
+        except NotionError as e:
+            error_message = f"❌ 生成当月时间统计报告失败\n\n错误: {str(e)}\n\n请检查Notion配置。"
+            self.send_to_feishu(error_message)
+            logger.error(f"获取Notion数据失败: {e}")
+        except Exception as e:
+            error_message = f"❌ 生成当月时间统计报告失败\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"生成当月时间统计数据时发生错误: {e}")
 
 # 全局调度器实例
 scheduler_instance = DailyStatsScheduler()

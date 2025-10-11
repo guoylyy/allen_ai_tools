@@ -63,7 +63,7 @@ def run_manual_stats_endpoint(body: RunManualStatsBody):
     """手动运行一次统计（用于测试）"""
     try:
         run_manual_stats(body.start_date, body.end_date)
-        message = "手动统计任务已执行"
+        message = "手动统计任务已执行（本月时间统计）"
         if body.start_date and body.end_date:
             message = f"手动统计任务已执行（{body.start_date} 到 {body.end_date}）"
         return {"ok": True, "message": message}

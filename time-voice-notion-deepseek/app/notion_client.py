@@ -247,3 +247,16 @@ def get_current_month_expense_entries() -> List[Dict[str, Any]]:
         last_day = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
     
     return query_expense_entries(first_day, last_day)
+
+def get_current_month_time_entries() -> List[Dict[str, Any]]:
+    """获取当前月的所有时间条目"""
+    today = date.today()
+    # 当月第一天
+    first_day = today.replace(day=1)
+    # 当月最后一天
+    if today.month == 12:
+        last_day = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        last_day = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+    
+    return query_time_entries(first_day, last_day)
