@@ -7,8 +7,8 @@ from datetime import datetime, time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from .notion_client import get_yesterday_entries, NotionError
-from .stats import calculate_daily_stats, generate_daily_report
+from .notion_client import get_yesterday_entries, get_current_month_expense_entries, NotionError
+from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report
 
 # 配置日志
 logging.basicConfig(
@@ -42,7 +42,23 @@ class DailyStatsScheduler:
             replace_existing=True
         )
         
-        logger.info("定时任务已设置：每天0:01执行")
+        # 每月1号00:05执行，统计上个月的花销数据
+        monthly_trigger = CronTrigger(
+            day=1,
+            hour=0,
+            minute=5,
+            timezone="Asia/Shanghai"
+        )
+        
+        self.scheduler.add_job(
+            self.generate_monthly_expense_stats,
+            trigger=monthly_trigger,
+            id='monthly_expense_stats',
+            name='Generate monthly expense statistics',
+            replace_existing=True
+        )
+        
+        logger.info("定时任务已设置：每天0:01执行时间统计，每月1号0:05执行花销统计")
     
     def send_to_feishu(self, report: str):
         """通过飞书机器人发送报告"""
@@ -183,6 +199,46 @@ class DailyStatsScheduler:
             error_message = f"❌ 生成日期范围统计报告失败\n\n错误: {str(e)}"
             self.send_to_feishu(error_message)
             logger.error(f"生成日期范围统计数据时发生错误: {e}")
+    
+    def generate_monthly_expense_stats(self):
+        """生成当月花销统计数据"""
+        try:
+            logger.info("开始生成当月花销统计数据...")
+            
+            # 获取当月的数据
+            entries = get_current_month_expense_entries()
+            logger.info(f"获取到 {len(entries)} 条花销记录")
+            
+            if not entries:
+                logger.warning("当月没有花销记录数据")
+                # 即使没有数据也发送通知
+                current_month = datetime.now().strftime('%Y年%m月')
+                no_data_message = f"💰 {current_month} 花销统计报告\n\n当月没有记录任何花销数据。"
+                self.send_to_feishu(no_data_message)
+                return
+            
+            # 计算统计数据
+            stats = calculate_monthly_expense_stats(entries)
+            
+            # 生成报告
+            report = generate_monthly_expense_report(stats)
+            
+            # 输出报告到日志
+            logger.info(f"当月花销统计报告:\n{report}")
+            
+            # 发送到飞书机器人
+            self.send_to_feishu(report)
+            
+            logger.info("当月花销统计数据生成完成")
+            
+        except NotionError as e:
+            error_message = f"❌ 生成当月花销统计报告失败\n\n错误: {str(e)}\n\n请检查Notion配置。"
+            self.send_to_feishu(error_message)
+            logger.error(f"获取Notion数据失败: {e}")
+        except Exception as e:
+            error_message = f"❌ 生成当月花销统计报告失败\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"生成花销统计数据时发生错误: {e}")
 
 # 全局调度器实例
 scheduler_instance = DailyStatsScheduler()

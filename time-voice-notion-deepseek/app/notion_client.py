@@ -179,3 +179,71 @@ def create_expense_entry(
             detail = r.text
         raise NotionError(f"Notion API error {r.status_code}: {detail}")
     return r.json()
+
+def query_expense_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
+    """查询指定日期范围内的所有花销条目"""
+    if not NOTION_DATABASE_ID2:
+        raise NotionError("NOTION_DATABASE_ID2 env var is missing.")
+    
+    # 构建查询过滤器
+    filter_data = {
+        "and": [
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_after": start_date.isoformat()
+                }
+            },
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_before": end_date.isoformat()
+                }
+            }
+        ]
+    }
+    
+    payload = {
+        "filter": filter_data,
+        "sorts": [
+            {
+                "property": "Date",
+                "direction": "ascending"
+            }
+        ]
+    }
+    
+    r = requests.post(
+        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID2}/query",
+        headers=_headers(),
+        json=payload,
+        timeout=20
+    )
+    
+    if r.status_code >= 300:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    
+    result = r.json()
+    return result.get("results", [])
+
+def get_yesterday_expense_entries() -> List[Dict[str, Any]]:
+    """获取昨天的所有花销条目（基于东八区时间）"""
+    yesterday = date.today() - timedelta(days=1)
+    return query_expense_entries(yesterday, yesterday)
+
+def get_current_month_expense_entries() -> List[Dict[str, Any]]:
+    """获取当前月的所有花销条目"""
+    today = date.today()
+    # 当月第一天
+    first_day = today.replace(day=1)
+    # 当月最后一天
+    if today.month == 12:
+        last_day = today.replace(year=today.year + 1, month=1, day=1) - timedelta(days=1)
+    else:
+        last_day = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
+    
+    return query_expense_entries(first_day, last_day)

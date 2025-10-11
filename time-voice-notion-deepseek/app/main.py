@@ -70,6 +70,16 @@ def run_manual_stats_endpoint(body: RunManualStatsBody):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"执行手动统计失败: {str(e)}")
 
+@app.post("/expense-stats/run-manual")
+def run_manual_expense_stats_endpoint():
+    """手动运行一次花销统计（用于测试）"""
+    try:
+        from .scheduler import scheduler_instance
+        scheduler_instance.generate_monthly_expense_stats()
+        return {"ok": True, "message": "手动花销统计任务已执行"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"执行手动花销统计失败: {str(e)}")
+
 @app.post("/ingest")
 def ingest(body: IngestBody):
     try:
