@@ -1,0 +1,64 @@
+# 把本文件复制为 config.yaml 并按需修改
+timezone: "Europe/Berlin"
+
+notion:
+  # 二选一：直接填 database_id；或填 parent_page_id 后执行 scripts/create_notion_db.py
+  database_id: ""
+  parent_page_id: ""
+  # 把“每次 commit -> 一条记录”写入这个数据库
+  # 如果想生成日报聚合，可设置 aggregate_daily: true（默认 false）
+  aggregate_daily: false
+
+# 每天统计哪个时间窗口（本地时区）。默认统计“昨天”的提交
+time:
+  daily_window_local:
+    from: "yesterday 00:00:00"
+    to: "yesterday 23:59:59"
+  include_merges: false
+  diff_base: "first-parent"   # first-parent | all-parents
+
+# 前后端分类规则（glob）
+classify:
+  frontend_globs:
+    - "**/*.js"
+    - "**/*.jsx"
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.vue"
+    - "**/*.css"
+    - "**/*.scss"
+    - "**/*.less"
+    - "**/*.html"
+    - "**/*.svelte"
+    - "frontend/**"
+    - "web/**"
+  backend_globs:
+    - "**/*.py"
+    - "**/*.java"
+    - "**/*.go"
+    - "**/*.rs"
+    - "**/*.rb"
+    - "**/*.php"
+    - "**/*.cs"
+    - "**/*.kt"
+    - "**/*.scala"
+    - "**/*.sh"
+    - "**/*.sql"
+    - "backend/**"
+    - "server/**"
+
+repos:
+  - platform: github
+    owner: yiliang.guo
+    repo: allen_ai_tools
+    branch: main
+    # 可用 url 覆盖：url: "https://github.com/your-org/your-repo-1.git"
+    local_cache_dir: "/Users/mac/Develop/yiliang/allen_ai_tools"
+    since_days: 7
+  - platform: gitee
+    owner: yiliang.guo
+    repo: cxp9-fe
+    branch: master
+    # url: "https://gitee.com/your-team/sample-repo.git"
+    local_cache_dir: "/Users/mac/Develop/Gitee/cxp9-fe"
+    since_days: 7
