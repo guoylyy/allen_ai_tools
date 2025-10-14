@@ -17,21 +17,30 @@ STATE_FILE = Path("state.json")
 
 def load_state() -> Dict[str, Any]:
     if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        print(f"Loaded state with {len(state.get('inserted', {}))} repos tracked")
+        return state
+    print("No existing state file found, starting fresh")
     return {"inserted": {}}
 
 def save_state(state: Dict[str, Any]):
     STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
 
 def notion_upsert_commit(notion: NotionClient, database_id: str, repo_key: str, commit_payload: Dict[str, Any], state: Dict[str, Any]):
-    inserted = state.setdefault("inserted", {}).setdefault(repo_key, set())
-    # json can't store set; but we will convert when saving
+    # Ensure inserted is always a set for deduplication
+    if repo_key not in state["inserted"]:
+        state["inserted"][repo_key] = set()
+    
+    inserted = state["inserted"][repo_key]
+    
+    # Handle case where inserted might be a list (from JSON)
     if isinstance(inserted, list):
         inserted = set(inserted)
         state["inserted"][repo_key] = inserted
 
     unique_key = commit_payload["commit_sha"]
     if unique_key in inserted:
+        print(f"Skipping duplicate commit: {unique_key}")
         return
 
     title = f'{commit_payload["repo"]}:{commit_payload["short_sha"]} — {commit_payload["subject"][:70]}'

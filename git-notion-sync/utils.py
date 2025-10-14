@@ -20,6 +20,15 @@ def ensure_repo(repo_cfg: Dict[str,Any]) -> Path:
     """Clone or fetch repo, return local path."""
     path = repo_cache_dir(repo_cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # For local cache directories, just return the path without fetching
+    if repo_cfg.get("local_cache_dir"):
+        if not path.exists():
+            raise ValueError(f"Local cache directory does not exist: {path}")
+        if not (path / ".git").exists():
+            raise ValueError(f"Local cache directory is not a git repository: {path}")
+        return path
+    
     if not path.exists():
         url = repo_cfg.get("url")
         if not url:
@@ -58,14 +67,14 @@ def iter_commits_in_window(repo_path: Path, branch: str, window: Dict[str,Any], 
     # Format placeholders: %H sha, %an author name, %ae author email, %cI committer date iso, %s subject, %B body
     fmt = "%H%x1f%an%x1f%ae%x1f%cI%x1f%s%x1f%B%x1e"
     out = run(["git", "log", "--first-parent", f"--format={fmt}", branch], cwd=repo_path)
-    records = out.strip("\n").split("\x1e")
+    records = out.strip().split("\x1e")
     start = window["start_local"]
     end = window["end_local"]
 
     for rec in records:
         if not rec.strip():
             continue
-        parts = rec.split("\x1f")
+        parts = rec.strip().split("\x1f")
         sha, an, ae, ciso, subject, body = parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]
         t = datetime.fromisoformat(ciso.replace("Z","+00:00")).astimezone(start.tzinfo)
         if t < start or t > end:
