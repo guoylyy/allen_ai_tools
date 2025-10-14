@@ -129,3 +129,5 @@ python tests/test_date_range_stats.py
 - DeepSeek API 文档
 - Notion API 文档
 - FastAPI 文档
+
+update readme in 2025-10-14
