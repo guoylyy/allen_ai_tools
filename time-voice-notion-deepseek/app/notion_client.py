@@ -60,7 +60,7 @@ def create_time_entry(
     return r.json()
 
 def query_time_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
-    """查询指定日期范围内的所有时间条目"""
+    """查询指定日期范围内的所有时间条目（支持分页）"""
     if not NOTION_DATABASE_ID:
         raise NotionError("NOTION_DATABASE_ID env var is missing.")
     
@@ -110,22 +110,41 @@ def query_time_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]
         ]
     }
     
-    r = requests.post(
-        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
-        headers=_headers(),
-        json=payload,
-        timeout=20
-    )
+    all_results = []
+    has_more = True
+    start_cursor = None
     
-    if r.status_code >= 300:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    while has_more:
+        # 如果有下一页，添加 start_cursor 参数
+        if start_cursor:
+            payload["start_cursor"] = start_cursor
+        
+        r = requests.post(
+            f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID}/query",
+            headers=_headers(),
+            json=payload,
+            timeout=20
+        )
+        
+        if r.status_code >= 300:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise NotionError(f"Notion API error {r.status_code}: {detail}")
+        
+        result = r.json()
+        all_results.extend(result.get("results", []))
+        
+        # 检查是否有更多数据
+        has_more = result.get("has_more", False)
+        start_cursor = result.get("next_cursor")
+        
+        # 如果没有更多数据，退出循环
+        if not has_more or not start_cursor:
+            break
     
-    result = r.json()
-    return result.get("results", [])
+    return all_results
 
 def get_today_entries() -> List[Dict[str, Any]]:
     """获取今天的所有时间条目（基于东八区时间）"""
@@ -181,7 +200,7 @@ def create_expense_entry(
     return r.json()
 
 def query_expense_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
-    """查询指定日期范围内的所有花销条目"""
+    """查询指定日期范围内的所有花销条目（支持分页）"""
     if not NOTION_DATABASE_ID2:
         raise NotionError("NOTION_DATABASE_ID2 env var is missing.")
     
@@ -213,22 +232,41 @@ def query_expense_entries(start_date: date, end_date: date) -> List[Dict[str, An
         ]
     }
     
-    r = requests.post(
-        f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID2}/query",
-        headers=_headers(),
-        json=payload,
-        timeout=20
-    )
+    all_results = []
+    has_more = True
+    start_cursor = None
     
-    if r.status_code >= 300:
-        try:
-            detail = r.json()
-        except Exception:
-            detail = r.text
-        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    while has_more:
+        # 如果有下一页，添加 start_cursor 参数
+        if start_cursor:
+            payload["start_cursor"] = start_cursor
+        
+        r = requests.post(
+            f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID2}/query",
+            headers=_headers(),
+            json=payload,
+            timeout=20
+        )
+        
+        if r.status_code >= 300:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise NotionError(f"Notion API error {r.status_code}: {detail}")
+        
+        result = r.json()
+        all_results.extend(result.get("results", []))
+        
+        # 检查是否有更多数据
+        has_more = result.get("has_more", False)
+        start_cursor = result.get("next_cursor")
+        
+        # 如果没有更多数据，退出循环
+        if not has_more or not start_cursor:
+            break
     
-    result = r.json()
-    return result.get("results", [])
+    return all_results
 
 def get_yesterday_expense_entries() -> List[Dict[str, Any]]:
     """获取昨天的所有花销条目（基于东八区时间）"""
