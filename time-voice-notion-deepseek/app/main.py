@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
+import pytz
 import yaml
 
 from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, LLMParseError
@@ -83,7 +84,14 @@ def run_manual_expense_stats_endpoint():
 @app.post("/ingest")
 def ingest(body: IngestBody):
     try:
-        now = datetime.fromisoformat(body.now) if body.now else datetime.now()
+        # 正确处理时区：确保在北京时间早上8点前录入的数据算作当天的数据
+        if body.now:
+            now = datetime.fromisoformat(body.now)
+        else:
+            # 获取当前时间并添加北京时间时区
+            tz = pytz.timezone(body.tz or DEFAULT_TZ)
+            now = datetime.now(tz)
+        
         cats = []
         tags = []
         if CATEGORY_MAPPING:
@@ -135,7 +143,13 @@ class ExpenseBody(BaseModel):
 def expense(body: ExpenseBody):
     """记录花销"""
     try:
-        now = datetime.fromisoformat(body.now) if body.now else datetime.now()
+        # 同样修复花销记录中的时区问题
+        if body.now:
+            now = datetime.fromisoformat(body.now)
+        else:
+            # 获取当前时间并添加北京时间时区
+            tz = pytz.timezone(body.tz or DEFAULT_TZ)
+            now = datetime.now(tz)
         
         # 花销分类映射，可以扩展
         expense_categories = ["餐饮", "交通", "购物", "娱乐", "医疗", "学习", "住房", "其他", "工作"]
