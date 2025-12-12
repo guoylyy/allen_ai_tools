@@ -1,3 +1,4 @@
 *.config
 *.conf
 restart.sh
+.env

@@ -8,6 +8,10 @@ from typing import Optional
 from datetime import datetime
 import pytz
 import yaml
+from dotenv import load_dotenv
+
+# 加载.env文件
+load_dotenv()
 
 from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, LLMParseError
 from .notion_client import create_time_entry, create_expense_entry, NotionError
@@ -96,8 +100,19 @@ def ingest(body: IngestBody):
         tags = []
         if CATEGORY_MAPPING:
             cats = [v.get('category_name', k) for k, v in CATEGORY_MAPPING.items()]
-            tags = [v.get('tag_name', k) for k, v in CATEGORY_MAPPING.items()]  
-        parsed = parse_with_deepseek(body.utterance, now=now, tz=body.tz or DEFAULT_TZ, categories=cats or None)
+            # 提取所有关键词作为标签候选集
+            for v in CATEGORY_MAPPING.values():
+                keywords = v.get('keywords', [])
+                if isinstance(keywords, list):
+                    tags.extend(keywords)
+                else:
+                    tags.append(str(keywords))
+        # 去重并添加默认标签
+        tags = list(set(tags))
+        # 如果没有标签，使用默认标签
+        if not tags:
+            tags = ["工作", "学习", "放松", "运动", "杂项", "家庭", "社交", "健康"]
+        parsed = parse_with_deepseek(body.utterance, now=now, tz=body.tz or DEFAULT_TZ, categories=cats or None, tags=tags or None)
         activity = parsed.get('activity') or '未命名活动'
         start = datetime.fromisoformat(parsed['start_iso'])
         end = datetime.fromisoformat(parsed['end_iso'])

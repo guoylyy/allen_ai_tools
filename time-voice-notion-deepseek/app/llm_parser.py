@@ -45,7 +45,7 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
                     "start_iso": {"type":"string","description":"起始时间，ISO-8601（含时区），例：2025-10-03T09:00:00+08:00"},
                     "end_iso": {"type":"string","description":"结束时间，ISO-8601（含时区），例：2025-10-03T10:00:00+08:00"},
                     "activity": {"type":"string","description":"活动内容，保留动词短语即可"},
-                    "tags": {"type":"array","items":{"type":"string"},"description":"从 #标签 中提取，无则从候选集合中选取一个最合适的标签，不允许为空","enum": tags or []},
+                    "tags": {"type":"array","items":{"type":"string"},"description":"、必须从候选集合中选取一个最合适的标签，不允许为空","enum": tags or []},
                     "mentions": {"type":"array","items":{"type":"string"},"description":"从 @提及 中提取，无则空数组"},
                     "category": {"type":"string","description":"归类名，必须从候选集中选择一个最合适的分类，不允许为空","enum": cats},
                     "confidence": {"type":"number","description":"0-1 置信度","minimum":0,"maximum":1},
@@ -95,13 +95,70 @@ def parse_with_deepseek(utterance: str, now: datetime, tz: str, categories: Opti
         raise LLMParseError("Model did not return a tool call.")
     func = tool_calls[0]["function"]
     args = func.get("arguments","{}")
+    
+    # 尝试修复常见的 JSON 格式错误
+    def fix_json_string(json_str: str) -> str:
+        """修复常见的 JSON 格式错误"""
+        # 修复缺失的引号和冒号
+        import re
+        
+        # 模式1: 修复 "field: value" 为 "field": value
+        # 匹配类似 "tags: [], "mentions: [], "confidence: 0.95, "assumptions: [
+        patterns = [
+            (r'\"(tags):\s*(\[.*?\])', r'"\1": \2'),
+            (r'\"(mentions):\s*(\[.*?\])', r'"\1": \2'),
+            (r'\"(confidence):\s*([0-9.]+)', r'"\1": \2'),
+            (r'\"(assumptions):\s*(\[)', r'"\1": \2'),
+        ]
+        
+        fixed = json_str
+        for pattern, replacement in patterns:
+            fixed = re.sub(pattern, replacement, fixed)
+        
+        return fixed
+    
     try:
         parsed = json.loads(args)
+    except json.JSONDecodeError as e:
+        # 尝试修复 JSON
+        try:
+            fixed_args = fix_json_string(args)
+            parsed = json.loads(fixed_args)
+        except json.JSONDecodeError as e2:
+            # 如果修复后仍然失败，抛出原始错误
+            raise LLMParseError(f"Invalid JSON from function call: {e}; raw={args[:500]}")
     except Exception as e:
         raise LLMParseError(f"Invalid JSON from function call: {e}; raw={args[:500]}")
     for k in ["start_iso","end_iso","activity","tags","mentions","category","confidence","assumptions"]:
         if k not in parsed:
             raise LLMParseError(f"Missing key in function args: {k}")
+    
+    # 确保 tags 不为空
+    if not parsed.get("tags"):
+        # 根据 activity 或 category 添加一个默认标签
+        activity_lower = parsed.get("activity", "").lower()
+        category = parsed.get("category", "")
+        
+        # 尝试从 activity 中提取关键词作为标签
+        default_tags = []
+        if "开车" in activity_lower or "驾驶" in activity_lower or "通勤" in activity_lower:
+            default_tags = ["交通"]
+        elif "吃饭" in activity_lower or "用餐" in activity_lower or "午餐" in activity_lower or "晚餐" in activity_lower:
+            default_tags = ["吃饭"]
+        elif "工作" in activity_lower or "办公" in activity_lower:
+            default_tags = ["工作"]
+        elif "学习" in activity_lower or "读书" in activity_lower:
+            default_tags = ["学习"]
+        elif "运动" in activity_lower or "健身" in activity_lower:
+            default_tags = ["运动"]
+        elif "休息" in activity_lower or "睡觉" in activity_lower:
+            default_tags = ["休息"]
+        else:
+            # 使用 category 作为标签
+            default_tags = [category] if category else ["杂项"]
+        
+        parsed["tags"] = default_tags
+    
     return parsed
 
 def parse_expense_with_deepseek(utterance: str, now: datetime, tz: str, categories: Optional[List[str]] = None, tags: Optional[List[str]] = None) -> Dict[str, Any]:
@@ -163,8 +220,38 @@ def parse_expense_with_deepseek(utterance: str, now: datetime, tz: str, categori
         raise LLMParseError("Model did not return a tool call.")
     func = tool_calls[0]["function"]
     args = func.get("arguments","{}")
+    
+    # 使用相同的 JSON 修复逻辑
+    def fix_json_string(json_str: str) -> str:
+        """修复常见的 JSON 格式错误"""
+        # 修复缺失的引号和冒号
+        import re
+        
+        # 模式1: 修复 "field: value" 为 "field": value
+        # 匹配类似 "tags: [], "mentions: [], "confidence: 0.95, "assumptions: [
+        patterns = [
+            (r'\"(tags):\s*(\[.*?\])', r'"\1": \2'),
+            (r'\"(mentions):\s*(\[.*?\])', r'"\1": \2'),
+            (r'\"(confidence):\s*([0-9.]+)', r'"\1": \2'),
+            (r'\"(assumptions):\s*(\[)', r'"\1": \2'),
+        ]
+        
+        fixed = json_str
+        for pattern, replacement in patterns:
+            fixed = re.sub(pattern, replacement, fixed)
+        
+        return fixed
+    
     try:
         parsed = json.loads(args)
+    except json.JSONDecodeError as e:
+        # 尝试修复 JSON
+        try:
+            fixed_args = fix_json_string(args)
+            parsed = json.loads(fixed_args)
+        except json.JSONDecodeError as e2:
+            # 如果修复后仍然失败，抛出原始错误
+            raise LLMParseError(f"Invalid JSON from function call: {e}; raw={args[:500]}")
     except Exception as e:
         raise LLMParseError(f"Invalid JSON from function call: {e}; raw={args[:500]}")
     for k in ["content","amount","category","tags","confidence","assumptions"]:
