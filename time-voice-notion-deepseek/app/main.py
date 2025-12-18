@@ -16,6 +16,7 @@ load_dotenv()
 from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, parse_food_with_deepseek, parse_exercise_with_deepseek, LLMParseError
 from .notion_client import create_time_entry, create_expense_entry, create_food_entry, create_exercise_entry, NotionError
 from .scheduler import start_scheduler, stop_scheduler, run_manual_stats
+from .unified_ingest import classify_intent_with_deepseek, route_to_correct_endpoint, UnifiedIngestError
 
 app = FastAPI(title="Voice → Notion Time Logger (DeepSeek)", version="2.0.0")
 
@@ -354,3 +355,68 @@ def expense(body: ExpenseBody):
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class UnifiedIngestBody(BaseModel):
+    utterance: str = Field(..., description="用户指令，如'9点到10点写代码'、'午餐花了50元'、'跑步30分钟'等")
+    tz: Optional[str] = Field(default=DEFAULT_TZ, description="IANA timezone, e.g., Asia/Shanghai")
+    source: Optional[str] = None
+    now: Optional[str] = Field(default=None, description="Override current time (ISO 8601)")
+    force_type: Optional[str] = Field(default=None, description="强制指定类型: time, expense, food, exercise")
+
+@app.post("/unified-ingest")
+def unified_ingest(body: UnifiedIngestBody):
+    """
+    统一入口：接收用户指令，自动分类并路由到正确的API
+    
+    这个API会自动：
+    1. 使用AI分析用户指令的意图
+    2. 根据意图分类（时间、花销、饮食、运动）
+    3. 调用对应的API进行处理
+    4. 返回处理结果
+    
+    用户只需要向这一个API提交指令即可。
+    """
+    try:
+        # 如果指定了强制类型，直接使用
+        if body.force_type and body.force_type in ["time", "expense", "food", "exercise"]:
+            intent_type = body.force_type
+            classification_result = {
+                "intent_type": intent_type,
+                "confidence": 1.0,
+                "reasoning": "用户强制指定类型",
+                "extracted_info": {}
+            }
+        else:
+            # 使用AI进行分类
+            classification_result = classify_intent_with_deepseek(body.utterance)
+            intent_type = classification_result["intent_type"]
+        
+        # 记录分类结果
+        classification_info = {
+            "intent_type": intent_type,
+            "confidence": classification_result.get("confidence", 0),
+            "reasoning": classification_result.get("reasoning", ""),
+            "extracted_info": classification_result.get("extracted_info", {})
+        }
+        
+        # 路由到正确的端点
+        result = route_to_correct_endpoint(
+            intent_type=intent_type,
+            utterance=body.utterance,
+            tz=body.tz or DEFAULT_TZ,
+            source=body.source,
+            now=body.now
+        )
+        
+        # 在结果中添加分类信息
+        result["classification"] = classification_info
+        
+        return result
+        
+    except UnifiedIngestError as e:
+        raise HTTPException(status_code=400, detail=f"指令分类失败: {str(e)}")
+    except HTTPException as e:
+        # 重新抛出HTTP异常
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"统一入口处理失败: {str(e)}")

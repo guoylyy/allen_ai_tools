@@ -62,6 +62,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ## API 接口
 
 ### 主要接口
+- `POST /unified-ingest` - **统一入口**：接收用户指令，自动分类并路由到正确的API（推荐使用）
 - `POST /ingest` - 时间记录入口
 - `POST /expense` - 花销记录入口
 - `POST /food` - 饮食记录入口
@@ -71,24 +72,52 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 - `POST /stats/start` - 启动定时任务
 - `POST /stats/stop` - 停止定时任务
 
+### 统一入口 API (`/unified-ingest`)
+这个API会自动：
+1. 使用AI分析用户指令的意图
+2. 根据意图分类（时间、花销、饮食、运动）
+3. 调用对应的API进行处理
+4. 返回处理结果
+
+用户只需要向这一个API提交指令即可，无需关心具体是哪种类型的记录。
+
 ### 使用示例
 ```bash
-# 时间记录
+# 统一入口（推荐）- 自动分类
+curl -X POST http://localhost:8000/unified-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"9点到10点 写合同 #工作","source":"cli"}'
+
+curl -X POST http://localhost:8000/unified-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"午餐花了50元 #餐饮","source":"cli"}'
+
+curl -X POST http://localhost:8000/unified-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"午餐吃了鸡胸肉和蔬菜约400卡 #健康","source":"cli"}'
+
+curl -X POST http://localhost:8000/unified-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"跑步30分钟消耗了300卡 #有氧运动","source":"cli"}'
+
+# 强制指定类型（可选）
+curl -X POST http://localhost:8000/unified-ingest \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"测试","force_type":"time","source":"cli"}'
+
+# 原始API（仍然可用）
 curl -X POST http://localhost:8000/ingest \
   -H "Content-Type: application/json" \
   -d '{"utterance":"9点到10点 写合同 #工作","source":"cli"}'
 
-# 花销记录
 curl -X POST http://localhost:8000/expense \
   -H "Content-Type: application/json" \
   -d '{"utterance":"午餐花了50元 #餐饮","source":"cli"}'
 
-# 饮食记录
 curl -X POST http://localhost:8000/food \
   -H "Content-Type: application/json" \
   -d '{"utterance":"午餐吃了鸡胸肉和蔬菜约400卡 #健康","source":"cli"}'
 
-# 运动记录
 curl -X POST http://localhost:8000/exercise \
   -H "Content-Type: application/json" \
   -d '{"utterance":"跑步30分钟消耗了300卡 #有氧运动","source":"cli"}'
