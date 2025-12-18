@@ -13,8 +13,8 @@ from dotenv import load_dotenv
 # 加载.env文件
 load_dotenv()
 
-from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, LLMParseError
-from .notion_client import create_time_entry, create_expense_entry, NotionError
+from .llm_parser import parse_with_deepseek, parse_expense_with_deepseek, parse_food_with_deepseek, parse_exercise_with_deepseek, LLMParseError
+from .notion_client import create_time_entry, create_expense_entry, create_food_entry, create_exercise_entry, NotionError
 from .scheduler import start_scheduler, stop_scheduler, run_manual_stats
 
 app = FastAPI(title="Voice → Notion Time Logger (DeepSeek)", version="2.0.0")
@@ -137,6 +137,149 @@ def ingest(body: IngestBody):
                 "category": category,
                 "tags": tags,
                 "mentions": mentions,
+            },
+            "notion_page_id": created.get("id"),
+            "notion_url": created.get("url"),
+        }
+    except LLMParseError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except NotionError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FoodBody(BaseModel):
+    utterance: str = Field(..., description="e.g., '午餐吃了鸡胸肉和蔬菜约400卡 #健康'")
+    tz: Optional[str] = Field(default=DEFAULT_TZ, description="IANA timezone, e.g., Asia/Shanghai")
+    source: Optional[str] = None
+    now: Optional[str] = Field(default=None, description="Override current time (ISO 8601)")
+
+@app.post("/food")
+def food(body: FoodBody):
+    """记录饮食"""
+    try:
+        # 处理时区
+        if body.now:
+            now = datetime.fromisoformat(body.now)
+        else:
+            # 获取当前时间并添加北京时间时区
+            tz = pytz.timezone(body.tz or DEFAULT_TZ)
+            now = datetime.now(tz)
+        
+        # 饮食分类和标签
+        food_categories = ["早餐", "午餐", "晚餐", "零食", "加餐", "饮料"]
+        food_tags = ["健康", "高蛋白", "低碳水", "低脂肪", "快餐", "自制"]
+        
+        parsed = parse_food_with_deepseek(
+            body.utterance, 
+            now=now, 
+            tz=body.tz or DEFAULT_TZ, 
+            categories=food_categories,
+            tags=food_tags
+        )
+        
+        food_name = parsed.get('food') or '未命名食物'
+        calories = parsed.get('calories') or 0.0
+        protein = parsed.get('protein') or 0.0
+        carbs = parsed.get('carbs') or 0.0
+        fat = parsed.get('fat') or 0.0
+        category = parsed.get('category') or '其他'
+        tags = parsed.get('tags') or []
+        
+        notes = f"source={body.source or ''}; raw={body.utterance}; assumptions={'; '.join(parsed.get('assumptions') or [])}; confidence={parsed.get('confidence')}"
+        
+        created = create_food_entry(
+            food=food_name,
+            calories=calories,
+            protein=protein,
+            carbs=carbs,
+            fat=fat,
+            category=category,
+            tags=tags,
+            food_date=now,
+            notes=notes,
+        )
+        
+        return {
+            "ok": True,
+            "parsed": {
+                "food": food_name,
+                "calories": calories,
+                "protein": protein,
+                "carbs": carbs,
+                "fat": fat,
+                "category": category,
+                "tags": tags,
+            },
+            "notion_page_id": created.get("id"),
+            "notion_url": created.get("url"),
+        }
+    except LLMParseError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except NotionError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ExerciseBody(BaseModel):
+    utterance: str = Field(..., description="e.g., '跑步30分钟消耗了300卡 #有氧运动'")
+    tz: Optional[str] = Field(default=DEFAULT_TZ, description="IANA timezone, e.g., Asia/Shanghai")
+    source: Optional[str] = None
+    now: Optional[str] = Field(default=None, description="Override current time (ISO 8601)")
+
+@app.post("/exercise")
+def exercise(body: ExerciseBody):
+    """记录运动"""
+    try:
+        # 处理时区
+        if body.now:
+            now = datetime.fromisoformat(body.now)
+        else:
+            # 获取当前时间并添加北京时间时区
+            tz = pytz.timezone(body.tz or DEFAULT_TZ)
+            now = datetime.now(tz)
+        
+        # 运动分类和标签
+        exercise_categories = ["有氧运动", "力量训练", "柔韧性训练", "高强度间歇训练", "户外运动", "其他"]
+        exercise_tags = ["室内", "户外", "健身房", "家庭", "高强度", "低强度"]
+        
+        parsed = parse_exercise_with_deepseek(
+            body.utterance, 
+            now=now, 
+            tz=body.tz or DEFAULT_TZ, 
+            categories=exercise_categories,
+            tags=exercise_tags
+        )
+        
+        exercise_type = parsed.get('exercise_type') or '未命名运动'
+        duration_minutes = parsed.get('duration_minutes') or 0.0
+        calories_burned = parsed.get('calories_burned') or 0.0
+        intensity = parsed.get('intensity') or '中'
+        category = parsed.get('category') or '其他'
+        tags = parsed.get('tags') or []
+        
+        notes = f"source={body.source or ''}; raw={body.utterance}; assumptions={'; '.join(parsed.get('assumptions') or [])}; confidence={parsed.get('confidence')}"
+        
+        created = create_exercise_entry(
+            exercise_type=exercise_type,
+            duration_minutes=duration_minutes,
+            calories_burned=calories_burned,
+            intensity=intensity,
+            category=category,
+            tags=tags,
+            exercise_date=now,
+            notes=notes,
+        )
+        
+        return {
+            "ok": True,
+            "parsed": {
+                "exercise_type": exercise_type,
+                "duration_minutes": duration_minutes,
+                "calories_burned": calories_burned,
+                "intensity": intensity,
+                "category": category,
+                "tags": tags,
             },
             "notion_page_id": created.get("id"),
             "notion_url": created.get("url"),

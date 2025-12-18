@@ -9,6 +9,8 @@ import pytz
 NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "")
 NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "")
 NOTION_DATABASE_ID2 = os.environ.get("NOTION_DATABASE_ID2", "")
+NOTION_DATABASE_ID3 = os.environ.get("NOTION_DATABASE_ID3", "")  # 饮食记录数据库
+NOTION_DATABASE_ID4 = os.environ.get("NOTION_DATABASE_ID4", "")  # 运动记录数据库
 NOTION_VERSION = "2022-06-28"
 
 class NotionError(Exception):
@@ -298,3 +300,248 @@ def get_current_month_time_entries() -> List[Dict[str, Any]]:
         last_day = today.replace(month=today.month + 1, day=1) - timedelta(days=1)
     
     return query_time_entries(first_day, last_day)
+
+def create_food_entry(
+    food: str,
+    calories: float,
+    protein: float = 0,
+    carbs: float = 0,
+    fat: float = 0,
+    category: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    food_date: Optional[datetime] = None,
+    notes: Optional[str] = None,
+):
+    """创建饮食记录条目"""
+    if not NOTION_DATABASE_ID3:
+        raise NotionError("NOTION_DATABASE_ID3 env var is missing.")
+    
+    # 如果没有提供日期，使用当前日期
+    if food_date is None:
+        food_date = datetime.now()
+    
+    props = {
+        "Food": {"title": [{"text": {"content": food[:2000]}}]},
+        "Calories": {"number": calories},
+        "Protein": {"number": protein},
+        "Carbs": {"number": carbs},
+        "Fat": {"number": fat},
+        "Date": {"date": {"start": food_date.date().isoformat()}},
+    }
+    
+    if category:
+        props["Category"] = {"select": {"name": category}}
+    if tags:
+        props["Tags"] = {"multi_select": [{"name": t} for t in tags[:50]]}
+    if notes:
+        props["Notes"] = {"rich_text": [{"text": {"content": notes[:2000]}}]}
+    
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID3},
+        "properties": props,
+    }
+    
+    r = requests.post("https://api.notion.com/v1/pages", headers=_headers(), json=payload, timeout=20)
+    if r.status_code >= 300:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    return r.json()
+
+def query_food_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
+    """查询指定日期范围内的所有饮食条目（支持分页）"""
+    if not NOTION_DATABASE_ID3:
+        raise NotionError("NOTION_DATABASE_ID3 env var is missing.")
+    
+    # 构建查询过滤器
+    filter_data = {
+        "and": [
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_after": start_date.isoformat()
+                }
+            },
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_before": end_date.isoformat()
+                }
+            }
+        ]
+    }
+    
+    payload = {
+        "filter": filter_data,
+        "sorts": [
+            {
+                "property": "Date",
+                "direction": "ascending"
+            }
+        ]
+    }
+    
+    all_results = []
+    has_more = True
+    start_cursor = None
+    
+    while has_more:
+        # 如果有下一页，添加 start_cursor 参数
+        if start_cursor:
+            payload["start_cursor"] = start_cursor
+        
+        r = requests.post(
+            f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID3}/query",
+            headers=_headers(),
+            json=payload,
+            timeout=20
+        )
+        
+        if r.status_code >= 300:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise NotionError(f"Notion API error {r.status_code}: {detail}")
+        
+        result = r.json()
+        all_results.extend(result.get("results", []))
+        
+        # 检查是否有更多数据
+        has_more = result.get("has_more", False)
+        start_cursor = result.get("next_cursor")
+        
+        # 如果没有更多数据，退出循环
+        if not has_more or not start_cursor:
+            break
+    
+    return all_results
+
+def get_yesterday_food_entries() -> List[Dict[str, Any]]:
+    """获取昨天的所有饮食条目（基于东八区时间）"""
+    yesterday = date.today() - timedelta(days=1)
+    return query_food_entries(yesterday, yesterday)
+
+def create_exercise_entry(
+    exercise_type: str,
+    duration_minutes: float,
+    calories_burned: float = 0,
+    intensity: Optional[str] = None,
+    category: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    exercise_date: Optional[datetime] = None,
+    notes: Optional[str] = None,
+):
+    """创建运动记录条目"""
+    if not NOTION_DATABASE_ID4:
+        raise NotionError("NOTION_DATABASE_ID4 env var is missing.")
+    
+    # 如果没有提供日期，使用当前日期
+    if exercise_date is None:
+        exercise_date = datetime.now()
+    
+    props = {
+        "Exercise": {"title": [{"text": {"content": exercise_type[:2000]}}]},
+        "Duration": {"number": duration_minutes},
+        "Calories Burned": {"number": calories_burned},
+        "Date": {"date": {"start": exercise_date.date().isoformat()}},
+    }
+    
+    if intensity:
+        props["Intensity"] = {"select": {"name": intensity}}
+    if category:
+        props["Category"] = {"select": {"name": category}}
+    if tags:
+        props["Tags"] = {"multi_select": [{"name": t} for t in tags[:50]]}
+    if notes:
+        props["Notes"] = {"rich_text": [{"text": {"content": notes[:2000]}}]}
+    
+    payload = {
+        "parent": {"database_id": NOTION_DATABASE_ID4},
+        "properties": props,
+    }
+    
+    r = requests.post("https://api.notion.com/v1/pages", headers=_headers(), json=payload, timeout=20)
+    if r.status_code >= 300:
+        try:
+            detail = r.json()
+        except Exception:
+            detail = r.text
+        raise NotionError(f"Notion API error {r.status_code}: {detail}")
+    return r.json()
+
+def query_exercise_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]:
+    """查询指定日期范围内的所有运动条目（支持分页）"""
+    if not NOTION_DATABASE_ID4:
+        raise NotionError("NOTION_DATABASE_ID4 env var is missing.")
+    
+    # 构建查询过滤器
+    filter_data = {
+        "and": [
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_after": start_date.isoformat()
+                }
+            },
+            {
+                "property": "Date",
+                "date": {
+                    "on_or_before": end_date.isoformat()
+                }
+            }
+        ]
+    }
+    
+    payload = {
+        "filter": filter_data,
+        "sorts": [
+            {
+                "property": "Date",
+                "direction": "ascending"
+            }
+        ]
+    }
+    
+    all_results = []
+    has_more = True
+    start_cursor = None
+    
+    while has_more:
+        # 如果有下一页，添加 start_cursor 参数
+        if start_cursor:
+            payload["start_cursor"] = start_cursor
+        
+        r = requests.post(
+            f"https://api.notion.com/v1/databases/{NOTION_DATABASE_ID4}/query",
+            headers=_headers(),
+            json=payload,
+            timeout=20
+        )
+        
+        if r.status_code >= 300:
+            try:
+                detail = r.json()
+            except Exception:
+                detail = r.text
+            raise NotionError(f"Notion API error {r.status_code}: {detail}")
+        
+        result = r.json()
+        all_results.extend(result.get("results", []))
+        
+        # 检查是否有更多数据
+        has_more = result.get("has_more", False)
+        start_cursor = result.get("next_cursor")
+        
+        # 如果没有更多数据，退出循环
+        if not has_more or not start_cursor:
+            break
+    
+    return all_results
+
+def get_yesterday_exercise_entries() -> List[Dict[str, Any]]:
+    """获取昨天的所有运动条目（基于东八区时间）"""
+    yesterday = date.today() - timedelta(days=1)
+    return query_exercise_entries(yesterday, yesterday)

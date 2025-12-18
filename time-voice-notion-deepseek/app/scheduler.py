@@ -7,8 +7,8 @@ from datetime import datetime, time, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from .notion_client import get_yesterday_entries, get_current_month_expense_entries, get_current_month_time_entries, NotionError
-from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report, calculate_date_range_stats, generate_date_range_report
+from .notion_client import get_yesterday_entries, get_current_month_expense_entries, get_current_month_time_entries, get_yesterday_food_entries, get_yesterday_exercise_entries, NotionError
+from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report, calculate_date_range_stats, generate_date_range_report, calculate_daily_calorie_stats, generate_daily_calorie_report
 
 # 配置日志
 logging.basicConfig(
@@ -58,7 +58,22 @@ class DailyStatsScheduler:
             replace_existing=True
         )
         
-        logger.info("定时任务已设置：每天0:01执行时间统计，每月1号0:05执行花销统计")
+        # 每天00:10执行，统计昨天的热量数据
+        calorie_trigger = CronTrigger(
+            hour=0,
+            minute=10,
+            timezone="Asia/Shanghai"
+        )
+        
+        self.scheduler.add_job(
+            self.generate_daily_calorie_stats,
+            trigger=calorie_trigger,
+            id='daily_calorie_stats',
+            name='Generate daily calorie statistics',
+            replace_existing=True
+        )
+        
+        logger.info("定时任务已设置：每天0:01执行时间统计，0:10执行热量统计，每月1号0:05执行花销统计")
     
     def send_to_feishu(self, report: str):
         """通过飞书机器人发送报告"""
@@ -289,6 +304,48 @@ class DailyStatsScheduler:
             error_message = f"❌ 生成当月时间统计报告失败\n\n错误: {str(e)}"
             self.send_to_feishu(error_message)
             logger.error(f"生成当月时间统计数据时发生错误: {e}")
+    
+    def generate_daily_calorie_stats(self):
+        """生成每日热量统计数据"""
+        try:
+            logger.info("开始生成每日热量统计数据...")
+            
+            # 获取昨天的饮食和运动数据
+            food_entries = get_yesterday_food_entries()
+            exercise_entries = get_yesterday_exercise_entries()
+            
+            logger.info(f"获取到 {len(food_entries)} 条饮食记录和 {len(exercise_entries)} 条运动记录")
+            
+            if not food_entries and not exercise_entries:
+                logger.warning("昨天没有饮食和运动记录数据")
+                # 即使没有数据也发送通知
+                no_data_message = f"🔥 {datetime.now().strftime('%Y-%m-%d')} 热量统计报告\n\n昨天没有记录任何饮食和运动数据。"
+                self.send_to_feishu(no_data_message)
+                return
+            
+            # 计算热量统计数据（基础代谢率默认为1800卡路里）
+            bmr = 1800.0  # 可以根据用户信息调整
+            stats = calculate_daily_calorie_stats(food_entries, exercise_entries, bmr)
+            
+            # 生成报告
+            report = generate_daily_calorie_report(stats)
+            
+            # 输出报告到日志
+            logger.info(f"每日热量统计报告:\n{report}")
+            
+            # 发送到飞书机器人
+            self.send_to_feishu(report)
+            
+            logger.info("每日热量统计数据生成完成")
+            
+        except NotionError as e:
+            error_message = f"❌ 生成每日热量统计报告失败\n\n错误: {str(e)}\n\n请检查Notion配置。"
+            self.send_to_feishu(error_message)
+            logger.error(f"获取Notion数据失败: {e}")
+        except Exception as e:
+            error_message = f"❌ 生成每日热量统计报告失败\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"生成热量统计数据时发生错误: {e}")
 
 # 全局调度器实例
 scheduler_instance = DailyStatsScheduler()

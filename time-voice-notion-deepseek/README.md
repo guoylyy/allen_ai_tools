@@ -9,11 +9,14 @@
 ### 🎤 语音输入解析
 - **时间记录**: 解析口语时间表达（"9点到10点 写合同 #工作"）
 - **花销记录**: 解析消费记录（"午餐花了50元 #餐饮"）
+- **饮食记录**: 解析饮食内容（"午餐吃了鸡胸肉和蔬菜约400卡 #健康"）
+- **运动记录**: 解析运动内容（"跑步30分钟消耗了300卡 #有氧运动"）
 - **智能分类**: 基于 DeepSeek Function Calling 的灵活解析
 
 ### 📊 自动统计报告
 - **时间统计**: 每日自动统计前一天的时间使用情况
 - **花销统计**: 每月自动统计上个月的花销情况
+- **热量统计**: 每日自动统计前一天的热量缺口/盈余
 - **日期范围统计**: 支持手动指定日期范围统计
 - **飞书通知**: 通过飞书机器人发送统计报告
 
@@ -24,8 +27,10 @@
 ```bash
 # Notion配置
 NOTION_TOKEN=your_notion_integration_token_here
-NOTION_DATABASE_ID=your_time_database_id_here
-NOTION_DATABASE_ID2=your_expense_database_id_here
+NOTION_DATABASE_ID=your_time_database_id_here  # 时间记录数据库
+NOTION_DATABASE_ID2=your_expense_database_id_here  # 花销记录数据库
+NOTION_DATABASE_ID3=your_food_database_id_here  # 饮食记录数据库
+NOTION_DATABASE_ID4=your_exercise_database_id_here  # 运动记录数据库
 
 # DeepSeek配置
 DEEPSEEK_API_KEY=your_deepseek_api_key_here
@@ -59,6 +64,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ### 主要接口
 - `POST /ingest` - 时间记录入口
 - `POST /expense` - 花销记录入口
+- `POST /food` - 饮食记录入口
+- `POST /exercise` - 运动记录入口
 - `POST /stats/run-manual` - 手动运行统计（支持日期范围）
 - `POST /expense-stats/run-manual` - 手动运行花销统计
 - `POST /stats/start` - 启动定时任务
@@ -76,6 +83,16 @@ curl -X POST http://localhost:8000/expense \
   -H "Content-Type: application/json" \
   -d '{"utterance":"午餐花了50元 #餐饮","source":"cli"}'
 
+# 饮食记录
+curl -X POST http://localhost:8000/food \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"午餐吃了鸡胸肉和蔬菜约400卡 #健康","source":"cli"}'
+
+# 运动记录
+curl -X POST http://localhost:8000/exercise \
+  -H "Content-Type: application/json" \
+  -d '{"utterance":"跑步30分钟消耗了300卡 #有氧运动","source":"cli"}'
+
 # 日期范围统计
 curl -X POST http://localhost:8000/stats/run-manual \
   -H "Content-Type: application/json" \
@@ -85,6 +102,7 @@ curl -X POST http://localhost:8000/stats/run-manual \
 ## 定时任务
 
 - **时间统计**: 每天 00:01 执行（统计前一天数据）
+- **热量统计**: 每天 00:10 执行（统计前一天数据）
 - **花销统计**: 每月 1 号 00:05 执行（统计上个月数据）
 
 ## 移动端集成（Tasker）
