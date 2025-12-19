@@ -72,6 +72,11 @@ curl -X POST http://localhost:8000/exercise \
   -d '{"utterance":"跑步30分钟消耗了300卡 #有氧运动","source":"cli"}'
 ```
 
+### 生成报告
+```bash
+curl -X POST http://localhost:8000//unified-report/run-manual"  -H "Content-Type: application/json" 
+```
+
 ### 移动端集成 (Tasker)
 使用 Tasker 配置语音输入，发送到新的端点：
 - 饮食记录：`/food`

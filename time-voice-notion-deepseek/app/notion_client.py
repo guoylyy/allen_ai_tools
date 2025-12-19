@@ -270,6 +270,11 @@ def query_expense_entries(start_date: date, end_date: date) -> List[Dict[str, An
     
     return all_results
 
+def get_today_expense_entries() -> List[Dict[str, Any]]:
+    """获取今天的所有花销条目（基于东八区时间）"""
+    today = date.today()
+    return query_expense_entries(today, today)
+
 def get_yesterday_expense_entries() -> List[Dict[str, Any]]:
     """获取昨天的所有花销条目（基于东八区时间）"""
     yesterday = date.today() - timedelta(days=1)
@@ -419,6 +424,11 @@ def query_food_entries(start_date: date, end_date: date) -> List[Dict[str, Any]]
     
     return all_results
 
+def get_today_food_entries() -> List[Dict[str, Any]]:
+    """获取今天的所有饮食条目（基于东八区时间）"""
+    today = date.today()
+    return query_food_entries(today, today)
+
 def get_yesterday_food_entries() -> List[Dict[str, Any]]:
     """获取昨天的所有饮食条目（基于东八区时间）"""
     yesterday = date.today() - timedelta(days=1)
@@ -540,6 +550,11 @@ def query_exercise_entries(start_date: date, end_date: date) -> List[Dict[str, A
             break
     
     return all_results
+
+def get_today_exercise_entries() -> List[Dict[str, Any]]:
+    """获取今天的所有运动条目（基于东八区时间）"""
+    today = date.today()
+    return query_exercise_entries(today, today)
 
 def get_yesterday_exercise_entries() -> List[Dict[str, Any]]:
     """获取昨天的所有运动条目（基于东八区时间）"""
