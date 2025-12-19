@@ -7,8 +7,8 @@ from datetime import datetime, time, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from .notion_client import get_yesterday_entries, get_current_month_expense_entries, get_current_month_time_entries, get_yesterday_food_entries, get_yesterday_exercise_entries, NotionError
-from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report, calculate_date_range_stats, generate_date_range_report, calculate_daily_calorie_stats, generate_daily_calorie_report
+from .notion_client import get_yesterday_entries, get_current_month_expense_entries, get_current_month_time_entries, get_yesterday_food_entries, get_yesterday_exercise_entries, get_yesterday_expense_entries, NotionError
+from .stats import calculate_daily_stats, generate_daily_report, calculate_monthly_expense_stats, generate_monthly_expense_report, calculate_date_range_stats, generate_date_range_report, calculate_daily_calorie_stats, generate_daily_calorie_report, calculate_daily_expense_stats, generate_unified_daily_report
 
 # 配置日志
 logging.basicConfig(
@@ -73,7 +73,22 @@ class DailyStatsScheduler:
             replace_existing=True
         )
         
-        logger.info("定时任务已设置：每天0:01执行时间统计，0:10执行热量统计，每月1号0:05执行花销统计")
+        # 每天00:15执行，发送统一的每日报告
+        unified_trigger = CronTrigger(
+            hour=0,
+            minute=15,
+            timezone="Asia/Shanghai"
+        )
+        
+        self.scheduler.add_job(
+            self.generate_unified_daily_report,
+            trigger=unified_trigger,
+            id='unified_daily_report',
+            name='Generate unified daily report',
+            replace_existing=True
+        )
+        
+        logger.info("定时任务已设置：每天0:01执行时间统计，0:10执行热量统计，0:15执行统一报告，每月1号0:05执行花销统计")
     
     def send_to_feishu(self, report: str):
         """通过飞书机器人发送报告"""
@@ -346,6 +361,95 @@ class DailyStatsScheduler:
             error_message = f"❌ 生成每日热量统计报告失败\n\n错误: {str(e)}"
             self.send_to_feishu(error_message)
             logger.error(f"生成热量统计数据时发生错误: {e}")
+    
+    def generate_unified_daily_report(self):
+        """生成统一的每日报告，包含时间、热量和花销统计"""
+        try:
+            logger.info("开始生成统一的每日报告...")
+            
+            # 获取昨天的数据
+            time_entries = get_yesterday_entries()
+            food_entries = get_yesterday_food_entries()
+            exercise_entries = get_yesterday_exercise_entries()
+            expense_entries = get_yesterday_expense_entries()
+            
+            logger.info(f"获取到数据：时间记录 {len(time_entries)} 条，饮食记录 {len(food_entries)} 条，运动记录 {len(exercise_entries)} 条，花销记录 {len(expense_entries)} 条")
+            
+            # 如果没有数据，发送通知
+            if not time_entries and not food_entries and not exercise_entries and not expense_entries:
+                logger.warning("昨天没有任何记录数据")
+                no_data_message = f"📊 {datetime.now().strftime('%Y-%m-%d')} 每日综合报告\n\n昨天没有记录任何数据（时间、饮食、运动、花销）。"
+                self.send_to_feishu(no_data_message)
+                return
+            
+            # 计算各类统计数据
+            time_stats = None
+            calorie_stats = None
+            expense_stats = None
+            
+            # 时间统计
+            if time_entries:
+                time_stats = calculate_daily_stats(time_entries)
+            else:
+                time_stats = {
+                    "date": datetime.now().date() - timedelta(days=1),
+                    "total_entries": 0,
+                    "total_duration": 0,
+                    "categories": {},
+                    "category_percentages": {}
+                }
+            
+            # 热量统计
+            if food_entries or exercise_entries:
+                bmr = 1800.0
+                calorie_stats = calculate_daily_calorie_stats(food_entries, exercise_entries, bmr)
+            else:
+                calorie_stats = {
+                    "date": datetime.now().date() - timedelta(days=1),
+                    "total_calories_in": 0,
+                    "total_calories_out": 1800,  # 基础代谢
+                    "calorie_deficit": 1800,  # 没有摄入，所以是1800缺口
+                    "nutrition": {
+                        "total_protein": 0,
+                        "total_carbs": 0,
+                        "total_fat": 0,
+                        "protein_percentage": 0,
+                        "carbs_percentage": 0,
+                        "fat_percentage": 0
+                    }
+                }
+            
+            # 花销统计
+            if expense_entries:
+                expense_stats = calculate_daily_expense_stats(expense_entries)
+            else:
+                expense_stats = {
+                    "date": datetime.now().date() - timedelta(days=1),
+                    "total_entries": 0,
+                    "total_amount": 0,
+                    "categories": {},
+                    "category_percentages": {}
+                }
+            
+            # 生成统一报告
+            report = generate_unified_daily_report(time_stats, calorie_stats, expense_stats)
+            
+            # 输出报告到日志
+            logger.info(f"统一每日报告:\n{report}")
+            
+            # 发送到飞书机器人
+            self.send_to_feishu(report)
+            
+            logger.info("统一每日报告生成完成")
+            
+        except NotionError as e:
+            error_message = f"❌ 生成统一每日报告失败\n\n错误: {str(e)}\n\n请检查Notion配置。"
+            self.send_to_feishu(error_message)
+            logger.error(f"获取Notion数据失败: {e}")
+        except Exception as e:
+            error_message = f"❌ 生成统一每日报告失败\n\n错误: {str(e)}"
+            self.send_to_feishu(error_message)
+            logger.error(f"生成统一每日报告时发生错误: {e}")
 
 # 全局调度器实例
 scheduler_instance = DailyStatsScheduler()

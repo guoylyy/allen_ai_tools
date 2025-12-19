@@ -868,3 +868,216 @@ def generate_date_range_expense_report(stats: Dict[str, Any]) -> str:
         report_lines.append(f"  ... 还有 {len(stats['parsed_entries']) - 20} 条记录")
     
     return "\n".join(report_lines)
+
+def generate_unified_daily_report(
+    time_stats: Dict[str, Any],
+    calorie_stats: Dict[str, Any],
+    expense_stats: Dict[str, Any]
+) -> str:
+    """生成统一的每日报告，包含时间、热量和花销统计
+    
+    Args:
+        time_stats: 时间统计数据
+        calorie_stats: 热量统计数据
+        expense_stats: 花销统计数据
+    """
+    report_lines = []
+    
+    # 报告标题
+    report_date = time_stats.get('date') or calorie_stats.get('date') or expense_stats.get('date')
+    if report_date:
+        if isinstance(report_date, date):
+            date_str = report_date.strftime('%Y-%m-%d')
+        else:
+            date_str = str(report_date)
+    else:
+        date_str = datetime.now().strftime('%Y-%m-%d')
+    
+    report_lines.append(f"📊 {date_str} 每日综合报告")
+    report_lines.append("=" * 60)
+    report_lines.append("")
+    
+    # 1. 时间统计部分
+    report_lines.append("⏰ 时间统计")
+    report_lines.append("-" * 30)
+    report_lines.append(f"总时长: {time_stats.get('total_duration', 0):.1f} 小时")
+    report_lines.append(f"活动数量: {time_stats.get('total_entries', 0)} 个")
+    
+    # 主要分类
+    if time_stats.get('categories'):
+        report_lines.append("主要分类:")
+        for category, duration in list(time_stats['categories'].items())[:3]:  # 只显示前3个
+            percentage = time_stats.get('category_percentages', {}).get(category, 0)
+            report_lines.append(f"  {category}: {duration:.1f}h ({percentage}%)")
+    
+    report_lines.append("")
+    
+    # 2. 热量统计部分
+    report_lines.append("🔥 热量统计")
+    report_lines.append("-" * 30)
+    report_lines.append(f"总摄入: {calorie_stats.get('total_calories_in', 0):.0f} 卡")
+    report_lines.append(f"总消耗: {calorie_stats.get('total_calories_out', 0):.0f} 卡")
+    
+    deficit = calorie_stats.get('calorie_deficit', 0)
+    if deficit > 0:
+        report_lines.append(f"热量缺口: {deficit:.0f} 卡 (减脂)")
+    elif deficit < 0:
+        report_lines.append(f"热量盈余: {-deficit:.0f} 卡 (增重)")
+    else:
+        report_lines.append("热量平衡: 0 卡")
+    
+    # 营养成分
+    if calorie_stats.get('nutrition'):
+        nutrition = calorie_stats['nutrition']
+        report_lines.append(f"蛋白质: {nutrition.get('total_protein', 0):.0f}g ({nutrition.get('protein_percentage', 0):.0f}%)")
+        report_lines.append(f"碳水: {nutrition.get('total_carbs', 0):.0f}g ({nutrition.get('carbs_percentage', 0):.0f}%)")
+        report_lines.append(f"脂肪: {nutrition.get('total_fat', 0):.0f}g ({nutrition.get('fat_percentage', 0):.0f}%)")
+    
+    report_lines.append("")
+    
+    # 3. 花销统计部分
+    report_lines.append("💰 花销统计")
+    report_lines.append("-" * 30)
+    report_lines.append(f"总金额: {expense_stats.get('total_amount', 0):.2f} 元")
+    report_lines.append(f"消费次数: {expense_stats.get('total_entries', 0)} 次")
+    
+    # 主要分类
+    if expense_stats.get('categories'):
+        report_lines.append("主要分类:")
+        for category, amount in list(expense_stats['categories'].items())[:3]:  # 只显示前3个
+            percentage = expense_stats.get('category_percentages', {}).get(category, 0)
+            report_lines.append(f"  {category}: {amount:.2f}元 ({percentage}%)")
+    
+    report_lines.append("")
+    
+    # 4. 今日亮点
+    report_lines.append("✨ 今日亮点")
+    report_lines.append("-" * 30)
+    
+    # 时间亮点
+    if time_stats.get('total_duration', 0) > 0:
+        top_category = max(time_stats.get('categories', {}).items(), key=lambda x: x[1])[0] if time_stats.get('categories') else "无"
+        report_lines.append(f"• 主要时间投入: {top_category}")
+    
+    # 热量亮点
+    if calorie_stats.get('total_calories_in', 0) > 0:
+        if deficit > 100:
+            report_lines.append("• 热量控制良好，保持减脂趋势")
+        elif deficit < -100:
+            report_lines.append("• 热量摄入偏高，注意控制")
+    
+    # 花销亮点
+    if expense_stats.get('total_amount', 0) > 0:
+        avg_daily_expense = expense_stats.get('total_amount', 0)  # 如果是单日统计，就是当日总花销
+        if avg_daily_expense > 200:
+            report_lines.append("• 今日花销较高，注意预算")
+        elif avg_daily_expense < 50:
+            report_lines.append("• 今日花销控制得很好")
+    
+    report_lines.append("")
+    
+    # 5. 建议
+    report_lines.append("💡 明日建议")
+    report_lines.append("-" * 30)
+    
+    # 基于数据的建议
+    suggestions = []
+    
+    # 时间建议
+    if time_stats.get('total_duration', 0) < 8:
+        suggestions.append("增加工作时间投入")
+    elif time_stats.get('total_duration', 0) > 12:
+        suggestions.append("注意休息，避免过度劳累")
+    
+    # 热量建议
+    if deficit > 300:
+        suggestions.append("适当增加营养摄入")
+    elif deficit < -300:
+        suggestions.append("适当控制饮食热量")
+    
+    # 花销建议
+    if expense_stats.get('total_amount', 0) > 150:
+        suggestions.append("控制非必要消费")
+    
+    if suggestions:
+        for i, suggestion in enumerate(suggestions[:3], 1):  # 只显示前3个建议
+            report_lines.append(f"{i}. {suggestion}")
+    else:
+        report_lines.append("继续保持良好习惯！")
+    
+    report_lines.append("")
+    report_lines.append("=" * 60)
+    report_lines.append("📱 数据来源: Notion时间/饮食/运动/花销记录")
+    report_lines.append("⏰ 统计时间: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    
+    return "\n".join(report_lines)
+
+def calculate_daily_expense_stats(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """计算每日花销统计数据"""
+    parsed_entries = [parse_expense_entry(entry) for entry in entries]
+    
+    # 按分类统计
+    category_stats = defaultdict(float)
+    category_items = defaultdict(list)
+    
+    # 按标签统计
+    tag_stats = defaultdict(float)
+    
+    total_amount = 0
+    entry_count = len(parsed_entries)
+    
+    for entry in parsed_entries:
+        amount = entry["amount"]
+        category = entry["category"] or "未分类"
+        tags = entry["tags"]
+        
+        # 分类统计
+        category_stats[category] += amount
+        category_items[category].append({
+            "content": entry["content"],
+            "amount": amount,
+            "expense_date": entry["expense_date"]
+        })
+        
+        # 标签统计
+        for tag in tags:
+            tag_stats[tag] += amount
+        
+        total_amount += amount
+    
+    # 计算分类占比
+    category_percentages = {}
+    for category, amount in category_stats.items():
+        if total_amount > 0:
+            percentage = (amount / total_amount) * 100
+            category_percentages[category] = round(percentage, 1)
+    
+    # 计算标签占比
+    tag_percentages = {}
+    for tag, amount in tag_stats.items():
+        if total_amount > 0:
+            percentage = (amount / total_amount) * 100
+            tag_percentages[tag] = round(percentage, 1)
+    
+    # 按金额排序
+    sorted_categories = sorted(category_stats.items(), key=lambda x: x[1], reverse=True)
+    sorted_tags = sorted(tag_stats.items(), key=lambda x: x[1], reverse=True)
+    
+    # 获取日期（使用第一个条目的日期或昨天）
+    report_date = None
+    if parsed_entries and parsed_entries[0]["expense_date"]:
+        report_date = parsed_entries[0]["expense_date"]
+    else:
+        report_date = date.today() - timedelta(days=1)
+    
+    return {
+        "date": report_date,
+        "total_entries": entry_count,
+        "total_amount": round(total_amount, 2),
+        "categories": dict(sorted_categories),
+        "category_percentages": category_percentages,
+        "category_items": dict(category_items),
+        "tags": dict(sorted_tags),
+        "tag_percentages": tag_percentages,
+        "parsed_entries": parsed_entries
+    }

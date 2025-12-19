@@ -86,6 +86,16 @@ def run_manual_expense_stats_endpoint():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"执行手动花销统计失败: {str(e)}")
 
+@app.post("/unified-report/run-manual")
+def run_manual_unified_report_endpoint():
+    """手动运行一次统一报告（用于测试）"""
+    try:
+        from .scheduler import scheduler_instance
+        scheduler_instance.generate_unified_daily_report()
+        return {"ok": True, "message": "手动统一报告任务已执行"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"执行手动统一报告失败: {str(e)}")
+
 @app.post("/ingest")
 def ingest(body: IngestBody):
     try:
