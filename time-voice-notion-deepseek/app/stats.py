@@ -2,6 +2,7 @@
 from __future__ import annotations
 from typing import Dict, List, Any
 from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 from collections import defaultdict
 
 def parse_notion_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -1008,7 +1009,7 @@ def generate_unified_daily_report(
     report_lines.append("")
     report_lines.append("=" * 60)
     report_lines.append("📱 数据来源: Notion时间/饮食/运动/花销记录")
-    report_lines.append("⏰ 统计时间: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    report_lines.append("⏰ 统计时间: " + datetime.now(ZoneInfo("Asia/Shanghai")).strftime('%Y-%m-%d %H:%M:%S'))
     
     return "\n".join(report_lines)
 
