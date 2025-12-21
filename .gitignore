@@ -3,3 +3,4 @@
 restart.sh
 .env
 .venv
+*.sh
