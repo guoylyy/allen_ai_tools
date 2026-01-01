@@ -27,52 +27,6 @@ class DailyStatsScheduler:
     
     def setup_scheduler(self):
         """设置定时任务"""
-        # 每天00:01执行，统计昨天的数据
-        trigger = CronTrigger(
-            hour=0,
-            minute=1,
-            timezone="Asia/Shanghai"
-        )
-        
-        self.scheduler.add_job(
-            self.generate_daily_stats,
-            trigger=trigger,
-            id='daily_stats',
-            name='Generate daily time statistics',
-            replace_existing=True
-        )
-        
-        # 每月1号00:05执行，统计上个月的花销数据
-        monthly_trigger = CronTrigger(
-            day=1,
-            hour=0,
-            minute=5,
-            timezone="Asia/Shanghai"
-        )
-        
-        self.scheduler.add_job(
-            self.generate_monthly_expense_stats,
-            trigger=monthly_trigger,
-            id='monthly_expense_stats',
-            name='Generate monthly expense statistics',
-            replace_existing=True
-        )
-        
-        # 每天00:10执行，统计昨天的热量数据
-        calorie_trigger = CronTrigger(
-            hour=0,
-            minute=10,
-            timezone="Asia/Shanghai"
-        )
-        
-        self.scheduler.add_job(
-            self.generate_daily_calorie_stats,
-            trigger=calorie_trigger,
-            id='daily_calorie_stats',
-            name='Generate daily calorie statistics',
-            replace_existing=True
-        )
-        
         # 每天23:30执行，发送当天的统一每日报告
         unified_trigger = CronTrigger(
             hour=23,
@@ -88,7 +42,7 @@ class DailyStatsScheduler:
             replace_existing=True
         )
         
-        logger.info("定时任务已设置：每天0:01执行时间统计，0:10执行热量统计，23:30执行当天统一报告，每月1号0:05执行花销统计")
+        logger.info("定时任务已设置：每天23:30执行当天统一报告")
     
     def send_to_feishu(self, report: str):
         """通过飞书机器人发送报告"""
