@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Baby 成长日记 - 定时自动部署脚本
+# 用于 Mac mini 定时任务 (cron)
+
+PROJECT_DIR="/Users/guoyiliang/Develop/allen_ai_tools/baby-growth-tracker"
+FRONTEND_DIR="$PROJECT_DIR/h5-frontend"
+
+cd "$PROJECT_DIR"
+
+# 检查是否有远程更新
+git fetch origin main
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+
+if [ "$LOCAL" != "$REMOTE" ]; then
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - 有新代码，开始部署..."
+    
+    # 拉取代码
+    git pull origin main
+    
+    # 安装依赖
+    cd "$PROJECT_DIR" && npm install --silent
+    cd "$FRONTEND_DIR" && npm install --silent
+    
+    # 重启服务
+    pm2 restart baby-growth-backend
+    pm2 restart baby-growth-frontend
+    
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - 部署完成"
+else
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - 无更新"
+fi

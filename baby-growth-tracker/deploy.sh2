@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# Baby 成长日记 - 一键部署脚本
+
+set -e
+
+echo "========================================="
+echo "  Baby 成长日记 部署脚本"
+echo "========================================="
+
+# 项目路径
+PROJECT_DIR="/Users/guoyiliang/Develop/allen_ai_tools/baby-growth-tracker"
+FRONTEND_DIR="$PROJECT_DIR/h5-frontend"
+
+echo ""
+echo "📦 拉取最新代码..."
+cd "$PROJECT_DIR"
+git pull origin main
+
+echo ""
+echo "📥 安装后端依赖..."
+cd "$PROJECT_DIR"
+npm install
+
+echo ""
+echo "📥 安装前端依赖..."
+cd "$FRONTEND_DIR"
+npm install
+
+echo ""
+echo "🔄 重启 PM2 服务..."
+
+# 安全删除 PM2 进程（如果不存在则忽略错误）
+pm2 describe baby-growth-backend > /dev/null 2>&1 && pm2 remove baby-growth-backend || true
+pm2 describe baby-growth-frontend > /dev/null 2>&1 && pm2 remove baby-growth-frontend || true
+
+
+# 重启后端
+cd $PROJECT_DIR
+pm2 start npm --name "baby-growth-backend" -- run start -- --port 3001
+
+
+# 重启前端
+echo "🔄 重启 前端 PM2 服务..."
+cd $FRONTEND_DIR
+pm2 start npm --name "baby-growth-frontend" -- run dev -- --port 3000
+
+echo ""
+echo "✅ 部署完成！"
+echo ""
+pm2 status

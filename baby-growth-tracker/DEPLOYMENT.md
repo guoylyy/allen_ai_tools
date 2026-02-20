@@ -3,17 +3,17 @@
 
 ```bash
 # 在 h5-frontend 目录
-npm run preview -- --port 3000
+npm run dev -- --port 3000
 
 # 或用 PM2 管理
-pm2 start npm --name "baby-growth-frontend" -- run preview -- --port 3000
+pm2 start npm --name "baby-growth-frontend" -- run dev -- --port 3000
 ```
 
 ### 后端
 
 ```bash
 # 在项目根目录
-pm2 start npm --name "baby-growth-backend" -- run start
+pm2 start npm --name "baby-growth-backend" -- run start -- --port 3001
 ```
 
 ### PM2 常用命令
