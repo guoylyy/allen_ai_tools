@@ -161,34 +161,92 @@ function parseRelativeDate(text) {
     return { date: targetDate, remainingText: text };
 }
 
+// 中文数字到阿拉伯数字的映射
+const chineseNumberMap = {
+    '零': 0, '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+    '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '半': 30, '刻': 15, 'quarter': 15
+};
+
+// 辅助函数：将中文数字转换为阿拉伯数字
+function parseChineseNumber(text) {
+    // 处理 "十几" 的情况 (十几分钟)
+    if (text === '十') {
+        return 10;
+    }
+    
+    // 处理 "半" (半小时 = 30分钟)
+    if (text === '半') {
+        return 30;
+    }
+    
+    // 处理 "刻" (一刻 = 15分钟)
+    if (text === '刻') {
+        return 15;
+    }
+    
+    // 处理纯数字
+    if (/^\d+$/.test(text)) {
+        return parseInt(text);
+    }
+    
+    // 处理中文数字
+    let result = 0;
+    for (const char of text) {
+        if (chineseNumberMap[char] !== undefined) {
+            result = result * 10 + chineseNumberMap[char];
+        }
+    }
+    return result > 0 ? result : null;
+}
+
 // 辅助函数：解析时间
 function parseTime(text) {
     let hour = null;
     let minute = 0;
     
-    // 处理 "下午X点" 或 "晚上X点"
-    const afternoonMatch = text.match(/(?:下午|晚上)(\d{1,2})点?(\d{0,2})/);
+    // 处理 "下午X点" 或 "晚上X点" (支持中文数字分钟)
+    const afternoonMatch = text.match(/(?:下午|晚上)(\d{1,2})点(?:([一二三四五六七八九十半刻]+)分?)?/);
     if (afternoonMatch) {
         hour = parseInt(afternoonMatch[1]);
-        minute = parseInt(afternoonMatch[2] || '0');
         if (hour < 12) hour += 12;
+        if (afternoonMatch[2]) {
+            minute = parseChineseNumber(afternoonMatch[2]) || 0;
+        }
         return { hour, minute };
     }
     
-    // 处理 "上午X点"
-    const morningMatch = text.match(/(?:上午)(\d{1,2})点?(\d{0,2})/);
+    // 处理 "上午X点" (支持中文数字分钟)
+    const morningMatch = text.match(/(?:上午)(\d{1,2})点(?:([一二三四五六七八九十半刻]+)分?)?/);
     if (morningMatch) {
         hour = parseInt(morningMatch[1]);
-        minute = parseInt(morningMatch[2] || '0');
+        if (morningMatch[2]) {
+            minute = parseChineseNumber(morningMatch[2]) || 0;
+        }
         return { hour, minute };
     }
     
-    // 处理纯数字时间 "X点" 或 "X点Y分"
-    const timeMatch = text.match(/(\d{1,2})点(\d{0,2})/);
+    // 处理纯数字时间 "X点Y分" 或 "X点Y"
+    const timeMatch = text.match(/(\d{1,2})点(\d+)/);
     if (timeMatch) {
         hour = parseInt(timeMatch[1]);
         minute = parseInt(timeMatch[2] || '0');
         return { hour, minute };
+    }
+    
+    // 处理中文数字时间 "X点Y分" (如 "3点十分", "3点二十分", "3点半")
+    const chineseTimeMatch = text.match(/(\d{1,2})点([一二三四五六七八九十半刻]+)/);
+    if (chineseTimeMatch) {
+        hour = parseInt(chineseTimeMatch[1]);
+        minute = parseChineseNumber(chineseTimeMatch[2]) || 0;
+        return { hour, minute };
+    }
+    
+    // 处理只有小时没有分钟的情况 "X点"
+    const hourOnlyMatch = text.match(/(\d{1,2})点/);
+    if (hourOnlyMatch) {
+        hour = parseInt(hourOnlyMatch[1]);
+        return { hour, minute: 0 };
     }
     
     return null;
