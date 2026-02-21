@@ -250,15 +250,15 @@ class MessageHandler {
             };
         }
 
-        // 情绪记录
-        const emotionMatch = content.match(/情绪\s*(开心 | 平静 | 烦躁 | 哭闹)/);
-        if (emotionMatch) {
+        // 营养补充记录
+        const supplementMatch = content.match(/(?:补钙|补锌|补充|营养|维生素|DHA|辅食)\s*(.+?)(?:\s+(\d+)(ml|克|袋|粒))?/i);
+        if (supplementMatch) {
             return {
-                type: 'emotion',
-                content: emotionMatch[1],
+                type: 'supplement',
+                content: supplementMatch[1] || content,
                 duration: null,
-                value: null,
-                emotion: emotionMatch[1]
+                value: supplementMatch[2] ? parseInt(supplementMatch[2]) : null,
+                emotion: null
             };
         }
 
@@ -287,7 +287,7 @@ class MessageHandler {
             eat: 0,
             play: 0,
             study: 0,
-            emotion: []
+            supplement: 0
         };
 
         records.forEach(record => {
@@ -299,8 +299,8 @@ class MessageHandler {
                 summary.play++;
             } else if (record.type === 'study' && record.duration) {
                 summary.study += record.duration;
-            } else if (record.type === 'emotion') {
-                summary.emotion.push(record.emotion);
+            } else if (record.type === 'supplement') {
+                summary.supplement++;
             }
         });
 
@@ -309,14 +309,7 @@ class MessageHandler {
         text += `🍼 饮食：${summary.eat}次\n`;
         text += `🎮 玩耍：${summary.play}次\n`;
         text += `📚 学习：${Math.floor(summary.study / 60)}小时${summary.study % 60}分钟\n`;
-        
-        if (summary.emotion.length > 0) {
-            const emotionCount = {};
-            summary.emotion.forEach(e => {
-                emotionCount[e] = (emotionCount[e] || 0) + 1;
-            });
-            text += `\n😊 情绪：${Object.entries(emotionCount).map(([k, v]) => `${k}(${v}次)`).join(', ')}\n`;
-        }
+        text += `💊 营养补充：${summary.supplement}次\n`;
 
         text += `\n记录总数：${records.length}条`;
         

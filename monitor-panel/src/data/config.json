@@ -1,0 +1,197 @@
+{
+  "projects": [
+    {
+      "id": "baby-growth",
+      "name": "Baby成长日记",
+      "status": "running",
+      "sla": 99.95,
+      "servers": ["local-macmini", "aliyun-1"],
+      "services": [
+        {
+          "name": "baby-growth-backend",
+          "type": "nodejs",
+          "port": 3001,
+          "version": "1.0.0",
+          "healthCheck": { "type": "http", "url": "http://localhost:3001/health" }
+        },
+        {
+          "name": "baby-growth-frontend",
+          "type": "vue",
+          "port": 3000,
+          "version": "1.0.0",
+          "healthCheck": { "type": "http", "url": "http://localhost:3000" }
+        }
+      ]
+    },
+    {
+      "id": "edu-project",
+      "name": "教育类项目",
+      "status": "running",
+      "sla": 99.9,
+      "servers": ["aliyun-1"],
+      "services": []
+    },
+    {
+      "id": "erp-project",
+      "name": "外贸ERP",
+      "status": "developing",
+      "sla": 99.5,
+      "servers": [],
+      "services": []
+    }
+  ],
+  "servers": [
+    {
+      "id": "local-macmini",
+      "name": "Mac mini (本地开发)",
+      "provider": "local",
+      "ip": "localhost",
+      "region": "杭州",
+      "status": "online",
+      "spec": "Apple M2 / 16GB",
+      "os": "macOS 14.0",
+      "uptime": 864000,
+      "monthlyCost": 0
+    },
+    {
+      "id": "aliyun-1",
+      "name": "阿里云服务器1 (ECS)",
+      "provider": "aliyun",
+      "ip": "101.133.227.199",
+      "region": "华东1(杭州)",
+      "status": "online",
+      "spec": "2核4G",
+      "os": "Ubuntu 22.04",
+      "uptime": 2592000,
+      "monthlyCost": 150,
+      "instanceId": "i-bp1xxxxx"
+    },
+    {
+      "id": "aliyun-2",
+      "name": "阿里云服务器2 (ECS)",
+      "provider": "aliyun",
+      "ip": "47.114.34.96",
+      "region": "华东1(杭州)",
+      "status": "online",
+      "spec": "2核4G",
+      "os": "Ubuntu 22.04",
+      "uptime": 2592000,
+      "monthlyCost": 150,
+      "instanceId": "i-bp1yyyyy"
+    }
+  ],
+  "metrics": {
+    "servers": {
+      "aliyun-1": {
+        "cpu": { "usage": 45, "load1": 1.2, "load5": 1.5, "load15": 1.3 },
+        "memory": { "total": 4096, "used": 2948, "free": 1148, "usage": 72 },
+        "disk": { "total": 100, "used": 45, "free": 55, "usage": 45 },
+        "network": { "in": 125, "out": 85, "tcpConn": 128 },
+        "process": { "total": 156, "running": 142, "sleeping": 14 }
+      },
+      "aliyun-2": {
+        "cpu": { "usage": 30, "load1": 0.8, "load5": 1.0, "load15": 0.9 },
+        "memory": { "total": 4096, "used": 2048, "free": 2048, "usage": 50 },
+        "disk": { "total": 100, "used": 40, "free": 60, "usage": 40 },
+        "network": { "in": 80, "out": 45, "tcpConn": 64 },
+        "process": { "total": 98, "running": 89, "sleeping": 9 }
+      }
+    },
+    "services": {
+      "baby-growth-backend": {
+        "status": "online",
+        "uptime": 86400,
+        "qps": 125,
+        "avgResponseTime": 85,
+        "p50ResponseTime": 45,
+        "p90ResponseTime": 150,
+        "p99ResponseTime": 320,
+        "errorRate": 0.12,
+        "http2xx": 15420,
+        "http4xx": 85,
+        "http5xx": 3,
+        "cpu": 15,
+        "memory": 256
+      }
+    }
+  },
+  "database": {
+    "mysql": {
+      "status": "online",
+      "version": "8.0.30",
+      "connections": { "current": 45, "max": 500, "usage": 9 },
+      "queries": { "qps": 520, "slowQueries": 3 },
+      "cache": { "hitRate": 87.5 },
+      "storage": { "used": 2.5, "total": 10, "usage": 25 }
+    }
+  },
+  "middleware": {
+    "redis": {
+      "status": "online",
+      "version": "7.0.0",
+      "connections": { "current": 12, "max": 10000 },
+      "memory": { "used": 45, "total": 512, "usage": 8.8 },
+      "keys": 15420,
+      "hitRate": 96.5
+    }
+  },
+  "business": {
+    "dau": 1250,
+    "newUsers": 85,
+    "activeSessions": 320,
+    "orders": 45,
+    "gmv": 12850,
+    "conversionRate": 3.2
+  },
+  "sla": {
+    "availability": 99.92,
+    "avgResponseTime": 85,
+    "p99ResponseTime": 320,
+    "errorRate": 0.12,
+    "uptime": 30,
+    "history": [
+      { "month": "2026-01", "availability": 99.95, "avgResponse": 78, "incidents": 0 },
+      { "month": "2025-12", "availability": 99.88, "avgResponse": 95, "incidents": 1 },
+      { "month": "2025-11", "availability": 99.92, "avgResponse": 82, "incidents": 0 }
+    ]
+  },
+  "costs": {
+    "2026-02": {
+      "服务器": 300,
+      "存储": 50,
+      "带宽": 30,
+      "域名": 0,
+      "CDN": 20,
+      "短信": 15,
+      "总计": 415
+    }
+  },
+  "alerts": [
+    {
+      "id": 1,
+      "level": "P2",
+      "type": "performance",
+      "title": "CPU使用率过高",
+      "message": "服务器 aliyun-1 CPU使用率达到85%",
+      "server": "aliyun-1",
+      "value": 85,
+      "threshold": 80,
+      "status": "processing",
+      "time": "2026-02-21 10:30:00",
+      "duration": "15分钟"
+    },
+    {
+      "id": 2,
+      "level": "P3",
+      "type": "resource",
+      "title": "内存使用率警告",
+      "message": "服务器 aliyun-1 内存使用率达到72%",
+      "server": "aliyun-1",
+      "value": 72,
+      "threshold": 70,
+      "status": "resolved",
+      "time": "2026-02-21 09:15:00",
+      "duration": "30分钟"
+    }
+  ]
+}

@@ -79,7 +79,7 @@ class Database {
                 child_id INT NOT NULL,
                 user_id INT NOT NULL,
                 openid VARCHAR(64) NOT NULL,
-                type ENUM('sleep', 'eat', 'play', 'study', 'emotion', 'milestone') NOT NULL,
+                type ENUM('sleep', 'eat', 'play', 'study', 'supplement', 'milestone') NOT NULL,
                 content TEXT,
                 duration INT,
                 value DECIMAL(10,2),
@@ -408,7 +408,7 @@ class Database {
             eat: { count: 0, duration: 0, total_value: 0 },
             play: { count: 0, duration: 0 },
             study: { count: 0, duration: 0 },
-            emotion: { count: 0 },
+            supplement: { count: 0 },
             milestone: { count: 0 }
         };
         

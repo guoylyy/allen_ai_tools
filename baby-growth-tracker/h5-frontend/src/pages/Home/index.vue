@@ -53,9 +53,21 @@ const filterTabs = ref([
   { id: 'sleep', name: '睡觉' },
   { id: 'eat', name: '吃饭' },
   { id: 'play', name: '玩耍' },
-  { id: 'study', name: '学习' }
+  { id: 'study', name: '学习' },
+  { id: 'supplement', name: '补剂' }
 ])
 const selectedFilter = ref('all')
+
+// 常用补剂选项
+const supplementOptions = [
+  { id: 'D3', name: 'D3' },
+  { id: 'AD', name: 'AD' },
+  { id: '益生菌', name: '益生菌' },
+  { id: 'DHA', name: 'DHA' },
+  { id: '钙', name: '钙' }
+]
+const selectedSupplement = ref('')
+const customSupplement = ref('')
 
 // 记录类型
 const recordTypes = [
@@ -63,7 +75,7 @@ const recordTypes = [
   { id: 'eat', name: '吃饭', icon: '🍼', color: 'bg-orange-100 text-orange-600' },
   { id: 'play', name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
   { id: 'study', name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
-  { id: 'emotion', name: '情绪', icon: '😊', color: 'bg-yellow-100 text-yellow-600' }
+  { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' }
 ]
 
 const currentRecordType = computed(() => 
@@ -194,14 +206,14 @@ const typeMap = {
   eat: { name: '吃饭', icon: '🍼', color: 'bg-orange-100 text-orange-600' },
   play: { name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
   study: { name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
-  emotion: { name: '情绪', icon: '😊', color: 'bg-yellow-100 text-yellow-600' },
+  supplement: { name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
   milestone: { name: '里程碑', icon: '🎉', color: 'bg-pink-100 text-pink-600' }
 }
 
 // 需要开始结束时间的类型
 const typesWithTimeRange = ['sleep', 'play', 'study']
 // 需要单个时间的类型
-const typesWithSingleTime = ['eat']
+const typesWithSingleTime = ['eat', 'supplement']
 
 // 获取最接近的整点
 function getNearestHour() {
@@ -232,6 +244,8 @@ function openManualModal() {
   manualEndTime.value = String(parseInt(nearestHour) + 1).padStart(2, '0') + ':00'
   
   manualAmount.value = ''
+  selectedSupplement.value = ''
+  customSupplement.value = ''
   // 自动填写默认分类的备注
   const defaultType = recordTypes.find(t => t.id === 'sleep')
   manualRemark.value = defaultType?.name || ''
@@ -251,6 +265,8 @@ function selectManualType(type) {
     manualEndTime.value = String(parseInt(nearestHour) + 1).padStart(2, '0') + ':00'
   }
   manualAmount.value = ''
+  selectedSupplement.value = ''
+  customSupplement.value = ''
   // 自动填写备注为分类名称
   const typeInfo = recordTypes.find(t => t.id === type)
   if (typeInfo) {
@@ -280,8 +296,8 @@ function calculateDuration() {
 
 // 获取记录的recorded_at时间
 function getRecordedAt() {
-  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat') {
-    // 有时间段或吃饭的，使用选择的时间
+  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement') {
+    // 有时间段或吃饭/补剂的，使用选择的时间
     return `${manualDate.value}T${manualStartTime.value}:00`
   } else {
     // 其他类型，使用日期+当前时间
@@ -317,6 +333,18 @@ async function submitManualRecord() {
       }
       if (!content) {
         content = '吃饭'
+      }
+    } else if (manualType.value === 'supplement') {
+      // 补剂：优先使用选中的补剂，其次使用自定义输入
+      const supplementName = selectedSupplement.value || customSupplement.value
+      if (supplementName) {
+        content = supplementName
+      }
+      if (manualRemark.value) {
+        content += (content ? '，' : '') + manualRemark.value
+      }
+      if (!content) {
+        content = '补剂'
       }
     } else {
       if (manualRemark.value) {
@@ -395,7 +423,6 @@ const formatTimeDisplay = (dateStr) => {
     return ''
   }
   
-  // 使用 getUTCHours 获取UTC时间加8小时后的值
   const hours = String(date.getUTCHours()).padStart(2, '0')
   const minutes = String(date.getUTCMinutes()).padStart(2, '0')
   return `${hours}:${minutes}`
@@ -987,6 +1014,41 @@ onUnmounted(() => {
                 />
                 <span class="text-gray-500">ml</span>
               </div>
+            </div>
+          </template>
+          
+          <!-- 补剂时间 -->
+          <template v-if="manualType === 'supplement'">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
+              <input
+                type="time"
+                v-model="manualStartTime"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <!-- 补剂选择 -->
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">选择补剂</label>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <button
+                  v-for="supplement in supplementOptions"
+                  :key="supplement.id"
+                  @click="selectedSupplement = supplement.id"
+                  class="px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                  :class="selectedSupplement === supplement.id 
+                    ? 'bg-pink-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                >
+                  {{ supplement.name }}
+                </button>
+              </div>
+              <input
+                type="text"
+                v-model="customSupplement"
+                placeholder="或输入其他补剂名称"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
             </div>
           </template>
           

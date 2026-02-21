@@ -62,7 +62,7 @@ class ReportService {
             eat: 0,
             play: 0,
             study: 0,
-            emotions: {}
+            supplement: 0
         };
 
         records.forEach(record => {
@@ -74,8 +74,8 @@ class ReportService {
                 summary.play++;
             } else if (record.type === 'study' && record.duration) {
                 summary.study += record.duration;
-            } else if (record.type === 'emotion' && record.emotion) {
-                summary.emotions[record.emotion] = (summary.emotions[record.emotion] || 0) + 1;
+            } else if (record.type === 'supplement') {
+                summary.supplement++;
             }
         });
 
@@ -88,16 +88,11 @@ class ReportService {
             `睡眠：${sleepHours}小时${sleepMinutes}分钟`,
             `饮食：${summary.eat}次`,
             `玩耍：${summary.play}次`,
-            `学习：${studyHours}小时${studyMinutes}分钟`
+            `学习：${studyHours}小时${studyMinutes}分钟`,
+            `营养补充：${summary.supplement}次`
         ].join(', ');
 
-        const emotionText = Object.entries(summary.emotions)
-            .map(([emotion, count]) => `${emotion}(${count}次)`)
-            .join(', ');
-
-        const remark = emotionText 
-            ? `今天情绪状态：${emotionText}\n宝宝今天表现很棒！`
-            : '记录总数：' + records.length + '条\n宝宝今天表现很棒！';
+        const remark = '记录总数：' + records.length + '条\n宝宝今天表现很棒！';
 
         return {
             summary: summaryText,

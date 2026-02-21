@@ -670,11 +670,20 @@ function parseNaturalLanguageLocal(text) {
             result.recorded_at = getLocalISOString(targetDate);
         }
     }
-    // 解析情绪
-    else if (lowerText.includes('情绪') || lowerText.includes('心情') || lowerText.includes('开心') || lowerText.includes('难过') || lowerText.includes('生气') || lowerText.includes('哭') || lowerText.includes('笑')) {
-        result.type = 'emotion';
-        result.typeName = '情绪';
-        result.message = '情绪数据已记录';
+    // 解析辅食/补充营养
+    else if (lowerText.includes('辅食') || lowerText.includes('补钙') || lowerText.includes('补锌') || lowerText.includes('补充') || lowerText.includes('营养') || lowerText.includes('维生素') || lowerText.includes(' DHA ')) {
+        result.type = 'supplement';
+        result.typeName = '营养补充';
+        result.message = '营养补充数据已记录';
+        
+        // 解析时间
+        const timeInfo = parseTime(dateInfo.text);
+        if (timeInfo) {
+            targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
+            console.log(`[营养补充记录] 时间: ${timeInfo.hour}点${timeInfo.minute ? timeInfo.minute + '分' : ''}`);
+        }
     }
     // 解析里程碑
     else if (lowerText.includes('里程碑') || lowerText.includes('第一次') || lowerText.includes('学会') || lowerText.includes('达成')) {
