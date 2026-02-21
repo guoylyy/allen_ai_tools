@@ -170,6 +170,9 @@ const chineseNumberMap = {
 
 // 辅助函数：将中文数字转换为阿拉伯数字
 function parseChineseNumber(text) {
+    // 去除 "分"、"分钟"、"秒" 等单位后缀
+    text = text.replace(/分|分钟|秒$/, '');
+    
     // 处理 "十几" 的情况 (十几分钟)
     if (text === '十') {
         return 10;
@@ -299,6 +302,39 @@ function validateAndCompleteResult(parsed, originalText) {
         parsed.message = `${typeName}已记录`;
     }
 
+    // 优先使用 AI 返回的 recorded_at（如果存在且有效）
+    if (parsed.recorded_at && typeof parsed.recorded_at === 'string') {
+        try {
+            // 尝试解析 AI 返回的时间
+            const aiDate = new Date(parsed.recorded_at);
+            if (!isNaN(aiDate.getTime())) {
+                // AI 已经解析了时间，直接使用，并转换为本地时间
+                // 确保是当前年份
+                aiDate.setFullYear(currentYear);
+                parsed.recorded_at = getLocalISOString(aiDate);
+                console.log(`[验证结果] 使用 AI 返回的时间: ${parsed.recorded_at}`);
+                
+                // 解析时长
+                const duration = parseDuration(originalText);
+                if (duration && !parsed.duration) {
+                    parsed.duration = duration;
+                }
+
+                // 确保有原始内容
+                if (!parsed.content) {
+                    parsed.content = originalText;
+                }
+
+                return parsed;
+            }
+        } catch (e) {
+            console.log(`[验证结果] AI 返回的时间解析失败: ${parsed.recorded_at}`);
+        }
+    }
+
+    // AI 没有返回有效的时间，执行本地解析作为后备
+    console.log(`[验证结果] 执行本地时间解析`);
+    
     // 解析相对日期和具体日期
     const dateInfo = parseRelativeDate(originalText);
     const timeInfo = parseTime(dateInfo.remainingText);
@@ -324,8 +360,8 @@ function validateAndCompleteResult(parsed, originalText) {
     if (timeInfo) {
         targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
     } else {
-        // 如果没有具体时间，使用中午12点
-        targetDate.setHours(12, 0, 0, 0);
+        // 如果没有具体时间，使用当前时间而不是中午12点
+        targetDate = new Date();
     }
     
     // 强制使用当前年份

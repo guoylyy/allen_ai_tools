@@ -458,6 +458,9 @@ const chineseNumberMap = {
 
 // 辅助函数：将中文数字转换为阿拉伯数字
 function parseChineseNumber(text) {
+    // 去除 "分"、"分钟"、"秒" 等单位后缀
+    text = text.replace(/分|分钟|秒$/, '');
+    
     if (text === '十') return 10;
     if (text === '半') return 30;
     if (text === '刻') return 15;
