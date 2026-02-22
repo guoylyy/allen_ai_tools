@@ -587,26 +587,38 @@ function parseNaturalLanguageLocal(text) {
         message: '数据已记录'
     };
     
-    // 创建目标日期
+    // 创建目标日期：默认使用今天
     let targetDate = new Date();
     
-    // 如果用户提到了相对日期
-    if (text.includes('昨天') || text.includes('昨日')) {
-        targetDate.setDate(now.getDate() - 1);
-    } else if (text.includes('前天')) {
-        targetDate.setDate(now.getDate() - 2);
-    } else if (text.includes('今天')) {
-        targetDate.setDate(now.getDate());
-    } else if (dateInfo && dateInfo.date) {
-        // 使用解析出的月/日，确保是当前年份
+    // 只有当用户明确提到相对日期或具体日期时才改变日期
+    // 否则默认使用今天
+    const hasRelativeDate = text.includes('昨天') || text.includes('昨日') || 
+                           text.includes('前天') || text.includes('今天');
+    const hasSpecificDate = dateInfo && dateInfo.date && (
+        text.match(/\d{1,2}\s*月\s*\d{1,2}/) ||  // "3月12日"
+        text.match(/^\d{1,2}\s*日$/)              // "12日"
+    );
+    
+    if (hasRelativeDate) {
+        // 如果用户提到了相对日期
+        if (text.includes('昨天') || text.includes('昨日')) {
+            targetDate.setDate(now.getDate() - 1);
+        } else if (text.includes('前天')) {
+            targetDate.setDate(now.getDate() - 2);
+        } else if (text.includes('今天')) {
+            targetDate.setDate(now.getDate());
+        }
+    } else if (hasSpecificDate) {
+        // 只有当用户明确提到具体日期（如"3月12日"或"12日"）时才使用
         const parsedMonth = dateInfo.date.getMonth();
         const parsedDay = dateInfo.date.getDate();
         targetDate = new Date(currentYear, parsedMonth, parsedDay);
     }
+    // else: 默认使用今天，不需要额外处理
     
     const lowerText = text.toLowerCase();
     
-    // 解析睡觉
+    // 解析睡觉 - 优先匹配，因为可能有复杂的时间段
     if (lowerText.includes('睡觉') || lowerText.includes('睡眠') || lowerText.includes('午睡') || lowerText.includes('入睡')) {
         result.type = 'sleep';
         result.typeName = '睡觉';
@@ -641,9 +653,14 @@ function parseNaturalLanguageLocal(text) {
                 targetDate.setFullYear(currentYear);
                 result.recorded_at = getLocalISOString(targetDate);
                 console.log(`[睡觉记录] 时间: ${timeInfo.hour}点${timeInfo.minute ? timeInfo.minute + '分' : ''}`);
+            } else {
+                // 如果没有识别到具体时间，使用当前时间
+                targetDate = new Date();
+                targetDate.setFullYear(currentYear);
+                result.recorded_at = getLocalISOString(targetDate);
             }
             
-            // 解析时长
+            // 解析时长 - 始终调用
             const duration = parseDuration(text);
             if (duration) {
                 result.duration = duration;
@@ -651,8 +668,8 @@ function parseNaturalLanguageLocal(text) {
             }
         }
     }
-    // 解析吃奶/喝奶
-    else if (lowerText.includes('吃奶') || lowerText.includes('喝奶') || lowerText.includes('喂奶') || lowerText.includes('母乳')) {
+    // 解析吃奶/喝奶 - 需要在"奶"之前匹配"吃奶"
+    else if (text.includes('吃奶') || text.includes('喝奶') || text.includes('喂奶') || text.includes('母乳')) {
         result.type = 'eat';
         result.typeName = '吃奶';
         result.message = '吃奶数据已记录';
@@ -669,10 +686,15 @@ function parseNaturalLanguageLocal(text) {
             targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
             targetDate.setFullYear(currentYear);
             result.recorded_at = getLocalISOString(targetDate);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
         }
     }
     // 解析吃饭/辅食
-    else if (lowerText.includes('吃饭') || lowerText.includes('辅食') || lowerText.includes('喝粥') || lowerText.includes('米糊') || lowerText.includes('吃米')) {
+    else if (text.includes('吃饭') || text.includes('辅食') || text.includes('喝粥') || text.includes('米糊') || text.includes('吃米')) {
         result.type = 'eat';
         result.typeName = '吃饭';
         result.message = '吃饭数据已记录';
@@ -683,10 +705,15 @@ function parseNaturalLanguageLocal(text) {
             targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
             targetDate.setFullYear(currentYear);
             result.recorded_at = getLocalISOString(targetDate);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
         }
     }
     // 解析玩耍
-    else if (lowerText.includes('玩耍') || lowerText.includes('玩') || lowerText.includes('游戏') || lowerText.includes('玩具')) {
+    else if (text.includes('玩耍') || text.includes('玩') || text.includes('游戏') || text.includes('玩具')) {
         result.type = 'play';
         result.typeName = '玩耍';
         result.message = '玩耍数据已记录';
@@ -696,18 +723,22 @@ function parseNaturalLanguageLocal(text) {
         if (timeInfo) {
             targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
             targetDate.setFullYear(currentYear);
-            
-            // 解析时长
-            const duration = parseDuration(text);
-            if (duration) {
-                result.duration = duration;
-            }
-            
-            result.recorded_at = getLocalISOString(targetDate);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
         }
+        
+        // 解析时长
+        const duration = parseDuration(text);
+        if (duration) {
+            result.duration = duration;
+        }
+        
+        result.recorded_at = getLocalISOString(targetDate);
     }
     // 解析学习
-    else if (lowerText.includes('学习') || lowerText.includes('学') || lowerText.includes('识字') || lowerText.includes('认字') || lowerText.includes('阅读') || lowerText.includes('绘本')) {
+    else if (text.includes('学习') || text.includes('学') || text.includes('识字') || text.includes('认字') || text.includes('阅读') || text.includes('绘本')) {
         result.type = 'study';
         result.typeName = '学习';
         result.message = '学习数据已记录';
@@ -718,10 +749,15 @@ function parseNaturalLanguageLocal(text) {
             targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
             targetDate.setFullYear(currentYear);
             result.recorded_at = getLocalISOString(targetDate);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
         }
     }
     // 解析辅食/补充营养
-    else if (lowerText.includes('辅食') || lowerText.includes('补钙') || lowerText.includes('补锌') || lowerText.includes('补充') || lowerText.includes('营养') || lowerText.includes('维生素') || lowerText.includes(' DHA ')) {
+    else if (text.includes('辅食') || text.includes('补钙') || text.includes('补锌') || text.includes('补充') || text.includes('营养') || text.includes('维生素') || text.includes('DHA')) {
         result.type = 'supplement';
         result.typeName = '营养补充';
         result.message = '营养补充数据已记录';
@@ -733,13 +769,29 @@ function parseNaturalLanguageLocal(text) {
             targetDate.setFullYear(currentYear);
             result.recorded_at = getLocalISOString(targetDate);
             console.log(`[营养补充记录] 时间: ${timeInfo.hour}点${timeInfo.minute ? timeInfo.minute + '分' : ''}`);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
         }
     }
     // 解析里程碑
-    else if (lowerText.includes('里程碑') || lowerText.includes('第一次') || lowerText.includes('学会') || lowerText.includes('达成')) {
+    else if (text.includes('里程碑') || text.includes('第一次') || text.includes('学会') || text.includes('达成')) {
         result.type = 'milestone';
         result.typeName = '里程碑';
         result.message = '里程碑已记录';
+        
+        // 里程碑也使用当前时间
+        targetDate = new Date();
+        targetDate.setFullYear(currentYear);
+        result.recorded_at = getLocalISOString(targetDate);
+    }
+    // 如果没有匹配到任何类型，也使用当前时间
+    else {
+        targetDate = new Date();
+        targetDate.setFullYear(currentYear);
+        result.recorded_at = getLocalISOString(targetDate);
     }
     
     return result;
