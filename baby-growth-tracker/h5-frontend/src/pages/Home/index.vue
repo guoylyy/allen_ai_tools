@@ -658,6 +658,35 @@ const sortedDates = computed(() => {
   return Object.keys(groupedRecords.value).sort((a, b) => new Date(b) - new Date(a))
 })
 
+// 格式化日期标题（今天、昨天、或具体日期）
+const formatDateHeader = (dateStr) => {
+  if (!dateStr) return ''
+
+  const today = new Date()
+  const targetDate = new Date(dateStr)
+
+  // 清除时间部分，只比较日期
+  today.setHours(0, 0, 0, 0)
+  targetDate.setHours(0, 0, 0, 0)
+
+  const diffDays = Math.round((today - targetDate)) / (1000 * 60 * 60 * 24)
+
+  if (diffDays === 0) {
+    return '今天'
+  } else if (diffDays === 1) {
+    return '昨天'
+  } else if (diffDays < 7) {
+    return `${diffDays}天前`
+  } else {
+    // 显示具体日期
+    const month = targetDate.getMonth() + 1
+    const day = targetDate.getDate()
+    const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+    const weekDay = weekDays[targetDate.getDay()]
+    return `${month}月${day}日 ${weekDay}`
+  }
+}
+
 // 加载记录
 async function loadRecords(isRefresh = false) {
   if (isRefresh) {
@@ -864,6 +893,11 @@ onUnmounted(() => {
       <div v-else class="space-y-3">
         <!-- 按日期分组显示 -->
         <template v-for="date in sortedDates" :key="date">
+          <!-- 日期标题 -->
+          <div class="sticky top-[140px] z-30 -mx-4 px-4 py-2 bg-gray-50 border-b border-gray-100">
+            <span class="text-sm font-medium text-gray-600">{{ formatDateHeader(date) }}</span>
+          </div>
+
           <!-- 当天记录 -->
           <div
             v-for="record in groupedRecords[date]"
