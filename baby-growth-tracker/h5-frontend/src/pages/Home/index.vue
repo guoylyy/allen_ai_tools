@@ -36,16 +36,30 @@ const manualEndTime = ref('')
 const manualAmount = ref('')
 const manualRemark = ref('')
 const isManualSubmitting = ref(false)
+const selectedSupplement = ref('')
+const customSupplement = ref('')
 
-// 修改弹窗相关
+// 修改弹窗相关（完整手动录入形式）
 const showEditModal = ref(false)
 const editingRecord = ref(null)
-const editContent = ref('')
+const editType = ref('sleep')
+const editDate = ref('')
+const editStartTime = ref('')
+const editEndTime = ref('')
+const editAmount = ref('')
+const editSupplement = ref('')
+const editCustomSupplement = ref('')
+const editRemark = ref('')
 const isEditing = ref(false)
 
-// 长按相关
-const pressTimer = ref(null)
-const LONG_PRESS_DURATION = 500
+// 删除确认弹窗
+const showDeleteConfirm = ref(false)
+const deletingRecord = ref(null)
+const isDeleting = ref(false)
+
+// 记录操作菜单
+const showRecordMenu = ref(false)
+const menuRecord = ref(null)
 
 // 类型筛选 Tab
 const filterTabs = ref([
@@ -66,8 +80,6 @@ const supplementOptions = [
   { id: 'DHA', name: 'DHA' },
   { id: '钙', name: '钙' }
 ]
-const selectedSupplement = ref('')
-const customSupplement = ref('')
 
 // 记录类型
 const recordTypes = [
@@ -82,17 +94,221 @@ const currentRecordType = computed(() =>
   recordTypes.find(t => t.id === selectedRecordType.value) || recordTypes[0]
 )
 
-// 长按开始
-function startPress(record) {
-  clearTimeout(pressTimer.value)
-  pressTimer.value = setTimeout(() => {
-    openEditModal(record)
-  }, LONG_PRESS_DURATION)
+// 打开记录菜单
+function openRecordMenu(record, event) {
+  event.stopPropagation()
+  menuRecord.value = record
+  showRecordMenu.value = true
 }
 
-// 长按结束
-function endPress() {
-  clearTimeout(pressTimer.value)
+// 关闭记录菜单
+function closeRecordMenu() {
+  showRecordMenu.value = false
+  menuRecord.value = null
+}
+
+// 点击编辑按钮
+function onEditClick(record) {
+  closeRecordMenu()
+  
+  // 解析记录内容
+  editingRecord.value = record
+  editType.value = record.type || 'sleep'
+  editRemark.value = record.content || ''
+  editAmount.value = ''
+  editSupplement.value = ''
+  editCustomSupplement.value = ''
+  
+  // 解析时间
+  if (record.time) {
+    const date = new Date(record.time)
+    editDate.value = date.toISOString().split('T')[0]
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    editStartTime.value = `${hours}:${minutes}`
+    
+    // 如果有duration，计算结束时间
+    if (record.duration) {
+      const durationMins = parseDurationToMinutes(record.duration)
+      const endDate = new Date(date.getTime() + durationMins * 60000)
+      const endHours = String(endDate.getHours()).padStart(2, '0')
+      const endMinutes = String(endDate.getMinutes()).padStart(2, '0')
+      editEndTime.value = `${endHours}:${endMinutes}`
+    } else {
+      editEndTime.value = ''
+    }
+  } else {
+    editDate.value = getLocalDateString()
+    editStartTime.value = ''
+    editEndTime.value = ''
+  }
+  
+  // 解析吃饭的量
+  if (record.type === 'eat' && record.content) {
+    const match = record.content.match(/(\d+)/)
+    if (match) {
+      editAmount.value = match[1]
+    }
+  }
+  
+  // 解析补剂
+  if (record.type === 'supplement' && record.content) {
+    const supplements = ['D3', 'AD', '益生菌', 'DHA', '钙']
+    for (const s of supplements) {
+      if (record.content.includes(s)) {
+        editSupplement.value = s
+        break
+      }
+    }
+    if (!editSupplement.value) {
+      editCustomSupplement.value = record.content
+    }
+  }
+  
+  showEditModal.value = true
+}
+
+// 解析duration字符串为分钟数
+function parseDurationToMinutes(durationStr) {
+  if (!durationStr) return 0
+  const hourMatch = durationStr.match(/(\d+)小时/)
+  const minMatch = durationStr.match(/(\d+)分钟/)
+  let total = 0
+  if (hourMatch) total += parseInt(hourMatch[1]) * 60
+  if (minMatch) total += parseInt(minMatch[1])
+  return total
+}
+
+// 点击删除按钮
+function onDeleteClick(record) {
+  closeRecordMenu()
+  deletingRecord.value = record
+  showDeleteConfirm.value = true
+}
+
+// 确认删除
+async function confirmDelete() {
+  if (!deletingRecord.value || isDeleting.value) return
+  
+  isDeleting.value = true
+  
+  try {
+    await api.deleteRecord(deletingRecord.value.id)
+    showDeleteConfirm.value = false
+    deletingRecord.value = null
+    alert('删除成功')
+    await loadRecords(true)
+  } catch (error) {
+    console.error('删除失败:', error)
+    alert('删除失败: ' + (error.message || '请重试'))
+  } finally {
+    isDeleting.value = false
+  }
+}
+
+// 取消删除
+function cancelDelete() {
+  showDeleteConfirm.value = false
+  deletingRecord.value = null
+}
+
+// 关闭修改弹窗
+function closeEditModal() {
+  showEditModal.value = false
+  editingRecord.value = null
+  editType.value = 'sleep'
+  editDate.value = ''
+  editStartTime.value = ''
+  editEndTime.value = ''
+  editAmount.value = ''
+  editSupplement.value = ''
+  editCustomSupplement.value = ''
+  editRemark.value = ''
+}
+
+// 计算编辑时的duration（分钟）
+function calculateEditDuration() {
+  if (!typesWithTimeRange.includes(editType.value)) {
+    return 0
+  }
+  
+  if (!editStartTime.value || !editEndTime.value) return 0
+  
+  const [startHour, startMin] = editStartTime.value.split(':').map(Number)
+  const [endHour, endMin] = editEndTime.value.split(':').map(Number)
+  
+  const startMinutes = startHour * 60 + startMin
+  let endMinutes = endHour * 60 + endMin
+  
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60
+  }
+  
+  return endMinutes - startMinutes
+}
+
+// 提交修改
+async function submitEdit() {
+  if (isEditing.value || !editingRecord.value) return
+  
+  isEditing.value = true
+  
+  try {
+    const duration = calculateEditDuration()
+    let content = ''
+    
+    // 构建content
+    if (typesWithTimeRange.includes(editType.value)) {
+      content = `${editStartTime.value}到${editEndTime.value}`
+      if (editRemark.value) {
+        content += `，${editRemark.value}`
+      }
+    } else if (editType.value === 'eat') {
+      if (editAmount.value) {
+        content = `${editAmount.value}ml`
+      }
+      if (editRemark.value) {
+        content += (content ? '，' : '') + editRemark.value
+      }
+      if (!content) {
+        content = '吃饭'
+      }
+    } else if (editType.value === 'supplement') {
+      const supplementName = editSupplement.value || editCustomSupplement.value
+      if (supplementName) {
+        content = supplementName
+      }
+      if (editRemark.value) {
+        content += (content ? '，' : '') + editRemark.value
+      }
+      if (!content) {
+        content = '补剂'
+      }
+    } else {
+      content = editRemark.value || ''
+    }
+    
+    const recordedAt = editDate.value && editStartTime.value 
+      ? `${editDate.value}T${editStartTime.value}:00`
+      : editingRecord.value.time
+    
+    await api.updateRecord(editingRecord.value.id, {
+      type: editType.value,
+      recorded_at: recordedAt,
+      content: content,
+      duration: duration,
+      value: editAmount.value ? parseFloat(editAmount.value) : null
+    })
+    
+    closeEditModal()
+    alert('修改成功')
+    await loadRecords(true)
+  } catch (error) {
+    console.error('修改失败:', error)
+    alert('修改失败: ' + (error.message || '请重试'))
+  } finally {
+    isEditing.value = false
+  }
 }
 
 // 选择筛选类型
@@ -141,42 +357,6 @@ function removeImage(id) {
   recordImages.value = recordImages.value.filter(img => img.id !== id)
 }
 
-// 打开修改弹窗
-function openEditModal(record) {
-  editingRecord.value = record
-  editContent.value = record.content || ''
-  showEditModal.value = true
-}
-
-// 关闭修改弹窗
-function closeEditModal() {
-  showEditModal.value = false
-  editingRecord.value = null
-  editContent.value = ''
-}
-
-// 提交修改
-async function submitEdit() {
-  if (!editContent.value.trim() || isEditing.value) return
-  
-  isEditing.value = true
-  
-  try {
-    await api.updateRecord(editingRecord.value.id, {
-      content: editContent.value.trim()
-    })
-    
-    closeEditModal()
-    alert('修改成功')
-    await loadRecords(true)
-  } catch (error) {
-    console.error('修改失败:', error)
-    alert('修改失败: ' + (error.message || '请重试'))
-  } finally {
-    isEditing.value = false
-  }
-}
-
 async function submitRecord() {
   if (isSubmitting.value) return
   isSubmitting.value = true
@@ -212,14 +392,11 @@ const typeMap = {
 
 // 需要开始结束时间的类型
 const typesWithTimeRange = ['sleep', 'play', 'study']
-// 需要单个时间的类型
-const typesWithSingleTime = ['eat', 'supplement']
 
 // 获取最接近的整点
 function getNearestHour() {
   const now = new Date()
   const minutes = now.getMinutes()
-  // 如果分钟超过30，向下取整；否则向上取整
   const hour = minutes > 30 ? now.getHours() + 1 : now.getHours()
   return String(hour).padStart(2, '0') + ':00'
 }
@@ -238,7 +415,6 @@ function openManualModal() {
   manualType.value = 'sleep'
   manualDate.value = getLocalDateString()
   
-  // 使用当前时间最接近的整点
   const nearestHour = getNearestHour()
   manualStartTime.value = nearestHour
   manualEndTime.value = String(parseInt(nearestHour) + 1).padStart(2, '0') + ':00'
@@ -246,7 +422,6 @@ function openManualModal() {
   manualAmount.value = ''
   selectedSupplement.value = ''
   customSupplement.value = ''
-  // 自动填写默认分类的备注
   const defaultType = recordTypes.find(t => t.id === 'sleep')
   manualRemark.value = defaultType?.name || ''
   showManualModal.value = true
@@ -258,7 +433,6 @@ function closeManualModal() {
 
 function selectManualType(type) {
   manualType.value = type
-  // 重置时间为当前最接近的整点
   if (typesWithTimeRange.includes(type)) {
     const nearestHour = getNearestHour()
     manualStartTime.value = nearestHour
@@ -267,7 +441,6 @@ function selectManualType(type) {
   manualAmount.value = ''
   selectedSupplement.value = ''
   customSupplement.value = ''
-  // 自动填写备注为分类名称
   const typeInfo = recordTypes.find(t => t.id === type)
   if (typeInfo) {
     manualRemark.value = typeInfo.name
@@ -286,7 +459,6 @@ function calculateDuration() {
   const startMinutes = startHour * 60 + startMin
   let endMinutes = endHour * 60 + endMin
   
-  // 如果结束时间小于开始时间，说明跨天了
   if (endMinutes < startMinutes) {
     endMinutes += 24 * 60
   }
@@ -297,10 +469,8 @@ function calculateDuration() {
 // 获取记录的recorded_at时间
 function getRecordedAt() {
   if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement') {
-    // 有时间段或吃饭/补剂的，使用选择的时间
     return `${manualDate.value}T${manualStartTime.value}:00`
   } else {
-    // 其他类型，使用日期+当前时间
     const now = new Date()
     const hours = String(now.getHours()).padStart(2, '0')
     const minutes = String(now.getMinutes()).padStart(2, '0')
@@ -317,7 +487,6 @@ async function submitManualRecord() {
     const duration = calculateDuration()
     const recordedAt = getRecordedAt()
     
-    // 构建content
     let content = ''
     if (typesWithTimeRange.includes(manualType.value)) {
       content = `${manualStartTime.value}到${manualEndTime.value}`
@@ -335,7 +504,6 @@ async function submitManualRecord() {
         content = '吃饭'
       }
     } else if (manualType.value === 'supplement') {
-      // 补剂：优先使用选中的补剂，其次使用自定义输入
       const supplementName = selectedSupplement.value || customSupplement.value
       if (supplementName) {
         content = supplementName
@@ -406,15 +574,11 @@ const formatTimeDisplay = (dateStr) => {
   
   let date
   if (dateStr.includes('T')) {
-    // ISO 格式
     date = new Date(dateStr)
   } else {
-    // MySQL datetime 格式，数据库存储的是UTC时间
-    // 需要转换为本地时间（+8小时）
     const [datePart, timePart] = dateStr.split(' ')
     const [year, month, day] = datePart.split('-').map(Number)
     const [hour, minute, second] = timePart.split(':').map(Number)
-    // 先创建为 UTC 时间，然后加8小时转为本地时间
     date = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
     date.setUTCHours(date.getUTCHours() + 8)
   }
@@ -511,7 +675,6 @@ async function loadRecords(isRefresh = false) {
     loadingMore.value = true
   }
   
-  // 获取当前选中的孩子ID
   const childId = userStore.currentChild?.id || 1
   
   try {
@@ -574,11 +737,9 @@ async function onRefresh() {
 
 // 确保获取孩子信息后再加载记录
 async function ensureChildLoaded() {
-  // 如果还没有当前孩子，先获取
   if (!userStore.currentChild) {
     await userStore.fetchChildren()
   }
-  // 如果还是没有，尝试从本地存储恢复
   if (!userStore.currentChild && userStore.children.length > 0) {
     const savedChildId = localStorage.getItem('currentChildId')
     if (savedChildId) {
@@ -598,12 +759,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
-  clearTimeout(pressTimer.value)
 })
 </script>
 
 <template>
-  <div class="min-h-screen pb-20">
+  <div class="min-h-screen pb-20" @click="closeRecordMenu">
     <!-- 头部 -->
     <header class="bg-gradient-to-r from-primary-500 to-primary-600 text-white p-4 sticky top-0 z-50">
       <div class="flex items-center justify-between">
@@ -666,7 +826,6 @@ onUnmounted(() => {
           :class="selectedFilter === tab.id ? 'text-primary-500' : 'text-gray-500'"
         >
           {{ tab.name }}
-          <!-- 高亮下划线 -->
           <span 
             v-if="selectedFilter === tab.id"
             class="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 rounded-full"
@@ -709,10 +868,7 @@ onUnmounted(() => {
           <div
             v-for="record in groupedRecords[date]"
             :key="record.id"
-            class="card p-3 animate-slide-up"
-            @touchstart="startPress(record)"
-            @touchend="endPress"
-            @touchcancel="endPress"
+            class="card p-3 bg-white rounded-xl shadow-sm"
           >
             <div class="flex items-start gap-3">
               <!-- 类型图标 -->
@@ -724,7 +880,20 @@ onUnmounted(() => {
               <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between mb-1">
                   <p class="font-medium truncate">{{ record.title }}</p>
-                  <span class="text-sm text-muted flex-shrink-0 ml-2">{{ record.timeStr }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted flex-shrink-0">{{ record.timeStr }}</span>
+                    <!-- 更多操作按钮 -->
+                    <button 
+                      @click="openRecordMenu(record, $event)"
+                      class="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <circle cx="10" cy="3" r="1.5"/>
+                        <circle cx="10" cy="10" r="1.5"/>
+                        <circle cx="10" cy="17" r="1.5"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
                 
                 <!-- 内容描述 -->
@@ -779,14 +948,60 @@ onUnmounted(() => {
       </div>
     </nav>
 
+    <!-- 记录操作菜单 -->
+    <Teleport to="body">
+      <div 
+        v-if="showRecordMenu" 
+        class="fixed inset-0 z-50"
+        @click="closeRecordMenu"
+      >
+        <div class="absolute inset-0 bg-black/30"></div>
+        <!-- 菜单弹窗 -->
+        <div 
+          class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl animate-slide-up"
+          @click.stop
+        >
+          <div class="p-4 border-b">
+            <div class="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-center">操作选项</h3>
+          </div>
+          <div class="p-2">
+            <button
+              @click="onEditClick(menuRecord)"
+              class="w-full p-4 flex items-center gap-3 hover:bg-gray-50 rounded-xl"
+            >
+              <span class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                ✏️
+              </span>
+              <span class="font-medium">编辑记录</span>
+            </button>
+            <button
+              @click="onDeleteClick(menuRecord)"
+              class="w-full p-4 flex items-center gap-3 hover:bg-red-50 rounded-xl"
+            >
+              <span class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                🗑️
+              </span>
+              <span class="font-medium text-red-600">删除记录</span>
+            </button>
+          </div>
+          <div class="p-4 border-t">
+            <button
+              @click="closeRecordMenu"
+              class="w-full p-3 bg-gray-100 rounded-xl font-medium text-center"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 记录弹窗 -->
     <Teleport to="body">
-      <div v-if="showRecordModal" class="fixed inset-0 z-50 flex items-end justify-center">
-        <!-- 遮罩 -->
-        <div class="absolute inset-0 bg-black/50" @click="closeRecordModal"></div>
-        <!-- 弹窗内容 -->
-        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up">
-          <!-- 头部 -->
+      <div v-if="showRecordModal" class="fixed inset-0 z-50 flex items-end justify-center" @click="closeRecordModal">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up" @click.stop>
           <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
             <button @click="closeRecordModal" class="text-gray-500">取消</button>
             <h3 class="font-semibold">记录{{ currentRecordType.name }}</h3>
@@ -799,7 +1014,6 @@ onUnmounted(() => {
             </button>
           </div>
           
-          <!-- 类型选择 -->
           <div class="p-4 border-b">
             <div class="flex gap-3 overflow-x-auto">
               <button
@@ -815,7 +1029,6 @@ onUnmounted(() => {
             </div>
           </div>
           
-          <!-- 时间选择 -->
           <div class="p-4 border-b">
             <label class="block text-sm font-medium text-gray-700 mb-2">记录时间</label>
             <input
@@ -825,7 +1038,6 @@ onUnmounted(() => {
             />
           </div>
           
-          <!-- 备注 -->
           <div class="p-4 border-b">
             <label class="block text-sm font-medium text-gray-700 mb-2">添加备注</label>
             <div class="flex gap-2 mb-2">
@@ -849,7 +1061,6 @@ onUnmounted(() => {
             </div>
           </div>
           
-          <!-- 图片 -->
           <div class="p-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">照片</label>
             <div class="flex flex-wrap gap-2">
@@ -879,38 +1090,184 @@ onUnmounted(() => {
       </div>
     </Teleport>
 
-    <!-- 修改弹窗 -->
+    <!-- 修改弹窗（完整手动录入形式） -->
     <Teleport to="body">
-      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-end justify-center">
-        <!-- 遮罩 -->
-        <div class="absolute inset-0 bg-black/50" @click="closeEditModal"></div>
-        <!-- 弹窗内容 -->
-        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up">
+      <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-end justify-center" @click="closeEditModal">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up" @click.stop>
           <!-- 头部 -->
           <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
             <button @click="closeEditModal" class="text-gray-500">取消</button>
-            <h3 class="font-semibold">修改记录</h3>
+            <h3 class="font-semibold">编辑记录</h3>
             <button 
               @click="submitEdit" 
-              :disabled="!editContent.trim() || isEditing"
+              :disabled="isEditing"
               class="text-primary-500 font-medium disabled:opacity-50"
             >
               {{ isEditing ? '保存中...' : '保存' }}
             </button>
           </div>
           
-          <!-- 修改内容 -->
+          <!-- 类型选择 -->
+          <div class="p-4 border-b">
+            <label class="block text-sm font-medium text-gray-700 mb-2">活动类型</label>
+            <div class="flex gap-2 overflow-x-auto pb-1">
+              <button
+                v-for="type in recordTypes"
+                :key="type.id"
+                @click="editType = type.id"
+                class="flex-shrink-0 flex flex-col items-center gap-1 p-3 rounded-xl"
+                :class="editType === type.id ? 'bg-orange-100 text-orange-600' : 'bg-gray-50 text-gray-600'"
+              >
+                <span class="text-xl">{{ type.icon }}</span>
+                <span class="text-xs">{{ type.name }}</span>
+              </button>
+            </div>
+          </div>
+          
+          <!-- 日期选择 -->
+          <div class="p-4 border-b">
+            <label class="block text-sm font-medium text-gray-700 mb-2">日期</label>
+            <input
+              type="date"
+              v-model="editDate"
+              class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          
+          <!-- 开始结束时间（睡觉、玩耍、学习） -->
+          <template v-if="typesWithTimeRange.includes(editType)">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间段</label>
+              <div class="flex items-center gap-3">
+                <div class="flex-1">
+                  <label class="block text-xs text-gray-500 mb-1">开始</label>
+                  <input
+                    type="time"
+                    v-model="editStartTime"
+                    class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+                <span class="text-gray-400 pt-5">至</span>
+                <div class="flex-1">
+                  <label class="block text-xs text-gray-500 mb-1">结束</label>
+                  <input
+                    type="time"
+                    v-model="editEndTime"
+                    class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
+              <p class="text-xs text-gray-500 mt-2">
+                时长: {{ formatDuration(calculateEditDuration()) }}
+              </p>
+            </div>
+          </template>
+          
+          <!-- 吃饭时间（单个时间） -->
+          <template v-if="editType === 'eat'">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
+              <input
+                type="time"
+                v-model="editStartTime"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <!-- 食量 -->
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">食量</label>
+              <div class="flex items-center gap-2">
+                <input
+                  type="number"
+                  v-model="editAmount"
+                  placeholder="请输入食量"
+                  class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <span class="text-gray-500">ml</span>
+              </div>
+            </div>
+          </template>
+          
+          <!-- 补剂时间 -->
+          <template v-if="editType === 'supplement'">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
+              <input
+                type="time"
+                v-model="editStartTime"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <!-- 补剂选择 -->
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">选择补剂</label>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <button
+                  v-for="supplement in supplementOptions"
+                  :key="supplement.id"
+                  @click="editSupplement = supplement.id"
+                  class="px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                  :class="editSupplement === supplement.id 
+                    ? 'bg-pink-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                >
+                  {{ supplement.name }}
+                </button>
+              </div>
+              <input
+                type="text"
+                v-model="editCustomSupplement"
+                placeholder="或输入其他补剂名称"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+          </template>
+          
+          <!-- 备注 -->
           <div class="p-4">
-            <label class="block text-sm font-medium text-gray-700 mb-2">记录内容</label>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              {{ editType === 'eat' ? '备注' : '备注信息' }}
+            </label>
             <textarea
-              v-model="editContent"
-              placeholder="输入修改后的内容..."
+              v-model="editRemark"
+              :placeholder="editType === 'eat' ? '例如：母乳、奶粉、辅食等' : '输入备注信息...'"
               class="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              rows="4"
+              rows="2"
             ></textarea>
-            <p class="text-xs text-gray-500 mt-2">
-              提示：可以修改内容，如将「3点50开始睡觉」改为「3点50到4点50睡觉」
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 删除确认弹窗 -->
+    <Teleport to="body">
+      <div v-if="showDeleteConfirm" class="fixed inset-0 z-50 flex items-center justify-center" @click="cancelDelete">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-white rounded-2xl w-[80%] max-w-[300px] p-6 animate-slide-up" @click.stop>
+          <div class="text-center">
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+              <span class="text-3xl">⚠️</span>
+            </div>
+            <h3 class="text-lg font-semibold mb-2">确认删除</h3>
+            <p class="text-gray-500 text-sm mb-6">
+              确定要删除这条记录吗？删除后无法恢复。
             </p>
+            <div class="flex gap-3">
+              <button
+                @click="cancelDelete"
+                class="flex-1 px-4 py-2 border border-gray-300 rounded-full text-gray-600 font-medium"
+              >
+                取消
+              </button>
+              <button
+                @click="confirmDelete"
+                :disabled="isDeleting"
+                class="flex-1 px-4 py-2 bg-red-500 text-white rounded-full font-medium disabled:opacity-50"
+              >
+                {{ isDeleting ? '删除中...' : '确认删除' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -918,12 +1275,9 @@ onUnmounted(() => {
 
     <!-- 手动录入弹窗 -->
     <Teleport to="body">
-      <div v-if="showManualModal" class="fixed inset-0 z-50 flex items-end justify-center">
-        <!-- 遮罩 -->
-        <div class="absolute inset-0 bg-black/50" @click="closeManualModal"></div>
-        <!-- 弹窗内容 -->
-        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up">
-          <!-- 头部 -->
+      <div v-if="showManualModal" class="fixed inset-0 z-50 flex items-end justify-center" @click="closeManualModal">
+        <div class="absolute inset-0 bg-black/50"></div>
+        <div class="relative bg-white rounded-t-2xl w-full max-h-[85vh] overflow-y-auto animate-slide-up" @click.stop>
           <div class="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
             <button @click="closeManualModal" class="text-gray-500">取消</button>
             <h3 class="font-semibold">手动录入</h3>
@@ -936,7 +1290,6 @@ onUnmounted(() => {
             </button>
           </div>
           
-          <!-- 类型选择 -->
           <div class="p-4 border-b">
             <label class="block text-sm font-medium text-gray-700 mb-2">活动类型</label>
             <div class="flex gap-2 overflow-x-auto pb-1">
@@ -953,7 +1306,6 @@ onUnmounted(() => {
             </div>
           </div>
           
-          <!-- 日期选择 -->
           <div class="p-4 border-b">
             <label class="block text-sm font-medium text-gray-700 mb-2">日期</label>
             <input
@@ -963,7 +1315,6 @@ onUnmounted(() => {
             />
           </div>
           
-          <!-- 开始结束时间（睡觉、玩耍、学习） -->
           <template v-if="typesWithTimeRange.includes(manualType)">
             <div class="p-4 border-b">
               <label class="block text-sm font-medium text-gray-700 mb-2">时间段</label>
@@ -992,7 +1343,6 @@ onUnmounted(() => {
             </div>
           </template>
           
-          <!-- 吃饭时间（单个时间） -->
           <template v-if="manualType === 'eat'">
             <div class="p-4 border-b">
               <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
@@ -1002,7 +1352,6 @@ onUnmounted(() => {
                 class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            <!-- 食量 -->
             <div class="p-4 border-b">
               <label class="block text-sm font-medium text-gray-700 mb-2">食量</label>
               <div class="flex items-center gap-2">
@@ -1017,7 +1366,6 @@ onUnmounted(() => {
             </div>
           </template>
           
-          <!-- 补剂时间 -->
           <template v-if="manualType === 'supplement'">
             <div class="p-4 border-b">
               <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
@@ -1027,7 +1375,6 @@ onUnmounted(() => {
                 class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
-            <!-- 补剂选择 -->
             <div class="p-4 border-b">
               <label class="block text-sm font-medium text-gray-700 mb-2">选择补剂</label>
               <div class="flex flex-wrap gap-2 mb-3">
@@ -1052,7 +1399,6 @@ onUnmounted(() => {
             </div>
           </template>
           
-          <!-- 备注 -->
           <div class="p-4">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               {{ manualType === 'eat' ? '备注' : '备注信息' }}
@@ -1069,3 +1415,20 @@ onUnmounted(() => {
     </Teleport>
   </div>
 </template>
+
+<style scoped>
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+</style>
