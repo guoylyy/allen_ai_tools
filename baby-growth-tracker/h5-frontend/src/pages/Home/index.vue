@@ -671,13 +671,11 @@ const formatDateHeader = (dateStr) => {
 
   const diffDays = Math.round((today - targetDate)) / (1000 * 60 * 60 * 24)
 
-  if (diffDays === 0) {
+  if (diffDays === 0 || diffDays < 0) {
     return '今天'
   } else if (diffDays === 1) {
     return '昨天'
-  } else if (diffDays < 7) {
-    return `${diffDays}天前`
-  } else {
+  }  else {
     // 显示具体日期
     const month = targetDate.getMonth() + 1
     const day = targetDate.getDate()
