@@ -214,22 +214,56 @@ class MessageHandler {
             };
         }
 
-        // 吃饭记录 (支持格式: 吃饭90ml, 吃饭 150ml, 吃饭奶粉150ml)
-        const eatMatch = content.match(/吃饭\s*(.+?)\s*(\d+)(ml|克|碗)?/);
+        // 吃饭记录
+        // 格式1: 吃饭90ml, 吃饭150ml (数字紧跟吃饭或只有空格分隔) -> content=null
+        // 格式2: 吃饭 辅食 150ml (空格+内容+空格+数字) -> content=辅食
+        // 格式3: 吃饭 一碗 (空格+内容，没有数字) -> content=一碗, value=1
+
+        // 先尝试匹配"吃饭 + 数字"格式（数字紧跟吃饭或只有空格分隔）
+        const eatMatch = content.match(/吃饭\s*(\d+)(ml|克|碗)?/);
         if (eatMatch) {
-            // 如果捕获组1是纯数字（即没有内容如"奶粉"），则将数字移到value，内容设为null
-            const contentPart = eatMatch[1];
-            const valuePart = eatMatch[2];
-            const unit = eatMatch[3];
-
-            // 判断：如果内容部分完全是数字或者为空，且有单位，说明格式是"吃饭90ml"
-            const isDirectValue = (!contentPart || /^\d+$/.test(contentPart)) && unit;
-
             return {
                 type: 'eat',
-                content: isDirectValue ? null : contentPart,
+                content: null,
                 duration: null,
-                value: isDirectValue ? parseInt(contentPart || valuePart) : parseInt(valuePart),
+                value: parseInt(eatMatch[1]),
+                emotion: null
+            };
+        }
+
+        // 尝试匹配"吃饭 + 内容 + 数字"格式（内容后面有空格+数字）
+        const eatWithContentMatch = content.match(/吃饭\s+(\S+)\s+(\d+)(ml|克|碗)?/);
+        if (eatWithContentMatch) {
+            return {
+                type: 'eat',
+                content: eatWithContentMatch[1],
+                duration: null,
+                value: parseInt(eatWithContentMatch[2]),
+                emotion: null
+            };
+        }
+
+        // 尝试匹配"吃饭 + 内容 + 数字"格式（内容与数字之间无空格，如：吃饭奶粉90ml）
+        const eatNoSpaceMatch = content.match(/吃饭(\D+)(\d+)(ml|克|碗)?/);
+        if (eatNoSpaceMatch) {
+            return {
+                type: 'eat',
+                content: eatNoSpaceMatch[1].trim(),
+                duration: null,
+                value: parseInt(eatNoSpaceMatch[2]),
+                emotion: null
+            };
+        }
+
+        // 尝试匹配"吃饭 + 内容"格式（只有内容，没有数字，如：一碗、奶粉）
+        const eatOnlyContentMatch = content.match(/吃饭\s+(.+)/);
+        if (eatOnlyContentMatch) {
+            // 默认value为1
+            return {
+                type: 'eat',
+                content: eatOnlyContentMatch[1],
+                duration: null,
+                value: 1,
                 emotion: null
             };
         }

@@ -31,7 +31,7 @@ ${Object.values(RECORD_TYPES).map(t => `- ${t.name}: ${t.keywords.join(', ')}`).
 1. 记录类型（必须）
 2. 记录时间（可选，格式 ISO）
 3. 时长/持续时间（可选，单位分钟）
-4. 数量/量（可选，如奶量）
+4. 数量/量（可选，如奶量，纯数字）
 5. 原始内容描述
 
 请以 JSON 格式返回结果：
@@ -40,6 +40,7 @@ ${Object.values(RECORD_TYPES).map(t => `- ${t.name}: ${t.keywords.join(', ')}`).
     "typeName": "类型名称",
     "recorded_at": "记录时间(ISO格式，如果没明确时间则为当前时间)",
     "duration": 时长(分钟，数字),
+    "value": 数量(纯数字，如90，没有则为空),
     "amount": "数量描述(如 90ml)",
     "content": "原始内容描述",
     "confidence": 0.0-1.0的置信度,
@@ -288,7 +289,7 @@ function validateAndCompleteResult(parsed, originalText) {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth();
     const currentDate = now.getDate();
-    
+
     // 验证类型
     const validTypes = Object.keys(RECORD_TYPES);
     if (!parsed.type || !validTypes.includes(parsed.type)) {
@@ -296,10 +297,25 @@ function validateAndCompleteResult(parsed, originalText) {
         parsed.typeName = '记录';
     }
 
+    // 处理 value 和 amount
+    // 如果 AI 没有返回 value，尝试从 amount 中解析（如 "90ml" -> 90）
+    if (!parsed.value && parsed.amount) {
+        const amountMatch = parsed.amount.match(/(\d+)/);
+        if (amountMatch) {
+            parsed.value = parseInt(amountMatch[1]);
+        }
+    }
+
+    // 如果 value 存在，在 message 中体现
+    const valueInfo = parsed.value ? ` ${parsed.value}ml` : '';
+
     // 确保有消息
     if (!parsed.message) {
         const typeName = RECORD_TYPES[parsed.type]?.name || '记录';
-        parsed.message = `${typeName}已记录`;
+        parsed.message = `${typeName}已记录${valueInfo}`;
+    } else if (parsed.value && !parsed.message.includes(valueInfo)) {
+        // 如果消息中还没有包含量信息，添加到消息末尾
+        parsed.message = parsed.message + valueInfo;
     }
 
     // 优先使用 AI 返回的 recorded_at（如果存在且有效且合理）

@@ -246,7 +246,7 @@ app.put('/api/records/:id', async (req, res) => {
                 type: result.type,
                 content: result.content,
                 duration: result.duration || 0,
-                amount: result.amount || null,
+                value: result.value || null,
                 recorded_at: originalRecord.recorded_at  // 保留原始记录时间
             };
             
@@ -255,7 +255,11 @@ app.put('/api/records/:id', async (req, res) => {
             // 直接更新指定字段
             if (type) updateData.type = type;
             if (duration !== undefined) updateData.duration = duration;
-            if (amount !== undefined) updateData.amount = amount;
+            if (amount !== undefined) {
+                // 将 amount 转换为 value（兼容 API 参数）
+                const amountValue = parseInt(amount);
+                updateData.value = isNaN(amountValue) ? null : amountValue;
+            }
         }
         
         await db.updateRecord(id, updateData);
@@ -393,7 +397,7 @@ app.post('/api/chat/process', async (req, res) => {
             content: result.content,
             recorded_at: result.recorded_at,
             duration: result.duration || 0,
-            amount: result.amount || null,
+            value: result.value || null,
             child_id: 1, // 默认使用第一个孩子
             openid: openid
         };
@@ -583,7 +587,7 @@ function parseNaturalLanguageLocal(text) {
         content: text,
         recorded_at: now.toISOString(),
         duration: null,
-        amount: null,
+        value: null,
         message: '数据已记录'
     };
     
@@ -673,11 +677,12 @@ function parseNaturalLanguageLocal(text) {
         result.type = 'eat';
         result.typeName = '吃奶';
         result.message = '吃奶数据已记录';
-        
+
         // 解析量
         const amountMatch = text.match(/(\d+)\s*ml|(\d+)\s*毫升/);
         if (amountMatch) {
-            result.amount = amountMatch[1] + 'ml';
+            result.value = parseInt(amountMatch[1]);
+            result.message = `吃奶数据已记录 ${result.value}ml`;
         }
         
         // 解析时间
