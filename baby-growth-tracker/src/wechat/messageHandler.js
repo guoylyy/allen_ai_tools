@@ -214,14 +214,22 @@ class MessageHandler {
             };
         }
 
-        // 吃饭记录
-        const eatMatch = content.match(/吃饭\s*(.+?)(?:\s+(\d+)(ml|克|碗))?/);
+        // 吃饭记录 (支持格式: 吃饭90ml, 吃饭 150ml, 吃饭奶粉150ml)
+        const eatMatch = content.match(/吃饭\s*(.+?)\s*(\d+)(ml|克|碗)?/);
         if (eatMatch) {
+            // 如果捕获组1是纯数字（即没有内容如"奶粉"），则将数字移到value，内容设为null
+            const contentPart = eatMatch[1];
+            const valuePart = eatMatch[2];
+            const unit = eatMatch[3];
+
+            // 判断：如果内容部分完全是数字或者为空，且有单位，说明格式是"吃饭90ml"
+            const isDirectValue = (!contentPart || /^\d+$/.test(contentPart)) && unit;
+
             return {
                 type: 'eat',
-                content: eatMatch[1],
+                content: isDirectValue ? null : contentPart,
                 duration: null,
-                value: eatMatch[2] ? parseInt(eatMatch[2]) : null,
+                value: isDirectValue ? parseInt(contentPart || valuePart) : parseInt(valuePart),
                 emotion: null
             };
         }
