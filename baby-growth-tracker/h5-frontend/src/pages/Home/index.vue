@@ -621,7 +621,7 @@ const formatDateDisplay = (dateStr) => {
     const [year, month, day] = datePart.split('-').map(Number)
     const [hour, minute, second] = timePart.split(':').map(Number)
     date = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
-    date.setUTCHours(date.getUTCHours() + 8)
+    date.setUTCHours(date.getUTCHours())
   }
   if (isNaN(date.getTime())) {
     return dateStr
@@ -664,6 +664,9 @@ const formatDateHeader = (dateStr) => {
 
   const today = new Date()
   const targetDate = new Date(dateStr)
+  console.log('========' , dateStr)
+
+  console.log('========' , dateStr)
 
   // 清除时间部分，只比较日期
   today.setHours(0, 0, 0, 0)
