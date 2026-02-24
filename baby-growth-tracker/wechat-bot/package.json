@@ -1,0 +1,19 @@
+{
+  "name": "baby-growth-wechat-bot",
+  "version": "1.0.0",
+  "description": "宝宝成长日报微信机器人 - 企业微信版",
+  "main": "index-wecom.js",
+  "scripts": {
+    "start": "node index-wecom.js",
+    "dev": "node index-wecom.js"
+  },
+  "dependencies": {
+    "wechaty": "^1.20.2",
+    "wechaty-puppet-wechat4u": "^1.14.1",
+    "wechaty-puppet-wework": "^1.0.3",
+    "qrcode-terminal": "^0.12.0",
+    "node-cron": "^3.0.3",
+    "mysql2": "^3.6.5",
+    "dotenv": "^16.3.1"
+  }
+}
