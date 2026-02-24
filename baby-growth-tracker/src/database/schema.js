@@ -69,9 +69,12 @@ const migrateDatabase = async (connection) => {
   await addColumn('family_members', 'is_admin', 'TINYINT(1) DEFAULT 0 COMMENT "是否管理员"');
   await addColumn('family_members', 'status', "ENUM('pending', 'active') DEFAULT 'pending' COMMENT '状态'");
 
+  // 相册照片表添加拍摄时间字段
+  await addColumn('album_photos', 'taken_at', 'DATETIME COMMENT "照片拍摄时间"');
+
   // 创建唯一索引
   try {
-    await connection.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)`);
+    // await connection.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)`);
     console.log('索引创建成功');
   } catch (error) {
     console.error('创建索引失败:', error.message);

@@ -872,6 +872,10 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
             return;
         }
         
+        // 获取拍摄时间（EXIF）
+        const takenAt = req.body.taken_at || null;
+        console.log('[上传图片] 拍摄时间:', takenAt);
+        
         // 获取当前孩子的ID
         let childId = 1;
         const currentChild = await db.getCurrentChild(req.openid);
@@ -898,7 +902,8 @@ app.post('/api/upload/image', upload.single('image'), async (req, res) => {
             description: '通过相册上传',
             child_id: childId,
             openid: req.openid,
-            qiniu_key: result.key
+            qiniu_key: result.key,
+            taken_at: takenAt
         });
         
         console.log('✅ 图片保存到数据库, id:', photoId);

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
+import ExifReader from 'exifreader'
 
 const router = useRouter()
 const photos = ref([])
@@ -123,6 +124,44 @@ function compressImage(file, maxWidth = 1200, quality = 0.8) {
   })
 }
 
+// 读取照片的 EXIF 拍摄时间
+async function getExifDate(file) {
+  try {
+    // 简单检查文件是否是图片
+    if (!file || !file.type || !file.type.startsWith('image/')) {
+      return null
+    }
+    
+    // 使用 ExifReader 读取 EXIF 数据
+    const tags = await ExifReader.load(file)
+    
+    // 尝试获取拍摄时间
+    let dateStr = null
+    
+    // 优先获取 DateTimeOriginal (拍摄时间)
+    if (tags.DateTimeOriginal) {
+      dateStr = tags.DateTimeOriginal.description
+    } else if (tags.DateTime) {
+      // 备用：获取 DateTime (修改时间)
+      dateStr = tags.DateTime.description
+    }
+    
+    if (dateStr) {
+      // EXIF 日期格式: "2024:01:15 10:30:00"
+      // 转换为 ISO 格式
+      const converted = dateStr.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3')
+      console.log('EXIF 拍摄时间:', converted)
+      return converted
+    } else {
+      console.log('未找到 EXIF 拍摄时间')
+      return null
+    }
+  } catch (e) {
+    console.log('EXIF 解析失败:', e.message)
+    return null
+  }
+}
+
 // 处理图片选择
 async function handlePhotoSelect(event) {
   const file = event.target.files?.[0]
@@ -131,8 +170,13 @@ async function handlePhotoSelect(event) {
   // 压缩图片
   isUploading.value = true
   let uploadFile = file
+  let takenAt = null
   
   try {
+    // 读取 EXIF 拍摄时间
+    takenAt = await getExifDate(file)
+    console.log('拍摄时间:', takenAt)
+    
     // 如果文件大于 500KB，先压缩
     if (file.size > 500 * 1024) {
       console.log('图片过大，开始压缩...')
@@ -147,6 +191,7 @@ async function handlePhotoSelect(event) {
         id: Date.now(),
         url: e.target.result,
         created_at: new Date().toISOString(),
+        taken_at: takenAt,
         local: true
       })
     }
@@ -156,6 +201,9 @@ async function handlePhotoSelect(event) {
     const formData = new FormData()
     formData.append('image', uploadFile)
     formData.append('description', '通过相册上传')
+    if (takenAt) {
+      formData.append('taken_at', takenAt)
+    }
     
     const result = await api.uploadImage(formData)
     console.log('上传结果:', result)

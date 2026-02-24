@@ -537,12 +537,13 @@ class Database {
     }
 
     // 获取相册照片（支持分页）
+    // 按拍摄时间(taken_at)排序，如果没有拍摄时间则按创建时间(created_at)排序
     async getAlbumPhotos(childId, options = {}) {
         const { limit = 30, offset = 0 } = options;
         const sql = `
             SELECT * FROM album_photos 
             WHERE child_id = ?
-            ORDER BY created_at DESC
+            ORDER BY COALESCE(taken_at, created_at) DESC
             LIMIT ? OFFSET ?
         `;
         const [photos] = await this.connection.query(sql, [childId, limit, offset]);
@@ -551,7 +552,7 @@ class Database {
 
     // 添加相册照片
     async addAlbumPhoto(data) {
-        const { child_id, user_id, openid, url, description, qiniu_key } = data;
+        const { child_id, user_id, openid, url, description, qiniu_key, taken_at } = data;
         
         // 获取或创建用户
         let userId = user_id;
@@ -566,10 +567,10 @@ class Database {
         }
 
         const sql = `
-            INSERT INTO album_photos (child_id, user_id, openid, url, description, qiniu_key)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO album_photos (child_id, user_id, openid, url, description, qiniu_key, taken_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-        const [result] = await this.connection.query(sql, [child_id, userId, openid, url, description, qiniu_key]);
+        const [result] = await this.connection.query(sql, [child_id, userId, openid, url, description, qiniu_key, taken_at || null]);
         return result.insertId;
     }
 
