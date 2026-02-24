@@ -1,11 +1,13 @@
 const express = require('express');
 const crypto = require('crypto');
 const dotenv = require('dotenv');
+const multer = require('multer');
 const WechatAPI = require('./wechat/api');
 const MessageHandler = require('./wechat/messageHandler');
 const ReportService = require('./services/reportService');
 const AIService = require('./services/aiService');
 const FamilyService = require('./services/familyService');
+const QiniuService = require('./services/qiniuService');
 const db = require('./database/connection');
 
 const familyService = new FamilyService(db);
@@ -17,6 +19,14 @@ const PORT = process.env.SERVER_PORT || 3000;
 
 // 微信配置
 const WECHAT_TOKEN = process.env.WECHAT_TOKEN;
+
+// 配置 multer 用于处理文件上传
+const upload = multer({ 
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB
+    }
+});
 
 // 中间件
 app.use(express.json());
@@ -855,26 +865,63 @@ function parseNaturalLanguageLocal(text) {
 }
 
 // ----- 图片上传（七牛云）-----
-app.post('/api/upload/image', async (req, res) => {
+app.post('/api/upload/image', upload.single('image'), async (req, res) => {
     try {
-        // 注意：Express 的 json 中间件不能处理 multipart/form-data
-        // 实际实现需要使用 multer 中间件
-        // 这里返回模拟数据，实际应该调用七牛云 SDK
+        if (!req.file) {
+            apiResponse(res, false, null, '请选择要上传的图片');
+            return;
+        }
         
-        // TODO: 实现七牛云图片上传
-        // 1. 使用 multer 接收文件
-        // 2. 调用七牛云上传凭证
-        // 3. 返回图片URL
+        // 获取当前孩子的ID
+        let childId = 1;
+        const currentChild = await db.getCurrentChild(req.openid);
+        if (currentChild) {
+            childId = currentChild.id;
+        } else {
+            const children = await db.getChildren(req.openid);
+            if (children.length > 0) {
+                childId = children[0].id;
+            }
+        }
         
-        // 模拟返回
-        const mockUrl = `https://placeholder.com/${Date.now()}.jpg`;
-        apiResponse(res, true, { 
-            url: mockUrl,
-            key: `album/${Date.now()}.jpg`
+        // 生成文件名
+        const key = QiniuService.generateKey('album');
+        
+        // 上传到七牛云
+        const result = await QiniuService.uploadFile(req.file.buffer, key);
+        
+        console.log('✅ 图片上传成功:', result.url);
+        
+        // 保存到数据库
+        const photoId = await db.addAlbumPhoto({
+            url: result.url,
+            description: '通过相册上传',
+            child_id: childId,
+            openid: req.openid,
+            qiniu_key: result.key
+        });
+        
+        console.log('✅ 图片保存到数据库, id:', photoId);
+        
+        apiResponse(res, true, {
+            id: photoId,
+            url: result.url,
+            key: result.key
         }, '上传成功');
     } catch (error) {
         console.error('上传图片失败:', error);
-        apiResponse(res, false, null, '上传失败');
+        apiResponse(res, false, null, '上传失败: ' + error.message);
+    }
+});
+
+// 获取七牛云上传凭证（供前端直传）
+app.get('/api/upload/token', (req, res) => {
+    try {
+        const token = QiniuService.getUploadToken();
+        apiResponse(res, true, { token }, '获取成功');
+    } catch (error) {
+        console.error('获取上传凭证失败:', error);
+        apiResponse(res, false, null, '获取失败');
     }
 });
 
@@ -1181,6 +1228,9 @@ app.listen(PORT, () => {
     
     // 初始化数据库
     db.initialize();
+    
+    // 初始化七牛云服务
+    QiniuService.init();
     
     // 启动定时任务（每日报告）
     ReportService.startDailyReport();

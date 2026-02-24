@@ -8,6 +8,10 @@ const photos = ref([])
 const isLoading = ref(false)
 const isUploading = ref(false)
 
+// 图片预览弹窗
+const showPreview = ref(false)
+const previewUrl = ref('')
+
 // 加载相册照片
 async function loadPhotos() {
   isLoading.value = true
@@ -47,10 +51,12 @@ async function handlePhotoSelect(event) {
   isUploading.value = true
   const formData = new FormData()
   formData.append('image', file)
-  formData.append('description', '通过聊天记录上传')
+  formData.append('description', '通过相册上传')
   
   try {
     const result = await api.uploadImage(formData)
+    console.log('上传结果:', result)
+    
     // 更新本地图片信息
     const localPhoto = photos.value.find(p => p.local && p.id > Date.now() - 5000)
     if (localPhoto) {
@@ -58,6 +64,9 @@ async function handlePhotoSelect(event) {
       localPhoto.local = false
       localPhoto.id = result.id
     }
+    
+    // 刷新相册
+    await loadPhotos()
   } catch (error) {
     console.error('上传失败:', error)
     // 移除上传失败的图片
@@ -66,6 +75,18 @@ async function handlePhotoSelect(event) {
     isUploading.value = false
     event.target.value = ''
   }
+}
+
+// 打开图片预览
+function openPreview(url) {
+  previewUrl.value = url
+  showPreview.value = true
+}
+
+// 关闭图片预览
+function closePreview() {
+  showPreview.value = false
+  previewUrl.value = ''
 }
 
 // 格式化日期
@@ -131,7 +152,8 @@ onMounted(() => {
         <div
           v-for="photo in photos"
           :key="photo.id"
-          class="aspect-square rounded-lg overflow-hidden bg-gray-100"
+          class="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
+          @click="openPreview(photo.url)"
         >
           <img 
             :src="photo.url" 
@@ -152,5 +174,37 @@ onMounted(() => {
         💬
       </button>
     </div>
+
+    <!-- 图片预览弹窗 -->
+    <Teleport to="body">
+      <div 
+        v-if="showPreview" 
+        class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+        @click="closePreview"
+      >
+        <!-- 关闭按钮 -->
+        <button 
+          class="absolute top-4 right-4 text-white text-2xl z-10"
+          @click="closePreview"
+        >
+          ✕
+        </button>
+        
+        <!-- 图片 -->
+        <img 
+          :src="previewUrl" 
+          class="max-w-full max-h-full object-contain"
+          alt="预览图片"
+          @click.stop
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
+
+<style scoped>
+/* 防止预览弹窗背景滚动 */
+:global(body) {
+  overflow: hidden;
+}
+</style>

@@ -144,13 +144,7 @@ onMounted(() => {
           <span class="text-xl">←</span>
         </button>
         <h1 class="flex-1 text-center font-semibold">聊天记录</h1>
-        <button 
-          @click="router.push('/album')" 
-          class="text-gray-600"
-          title="相册"
-        >
-          <span class="text-xl">🖼️</span>
-        </button>
+        <div class="w-8"></div>
       </div>
     </header>
 
@@ -241,21 +235,6 @@ onMounted(() => {
     <!-- 输入区域 -->
     <div class="fixed bottom-0 left-0 right-0 bg-white border-t p-3 pb-6">
       <div class="flex items-end gap-2 max-w-4xl mx-auto">
-        <!-- 图片按钮 -->
-        <button
-          @click="selectImage"
-          class="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl hover:bg-gray-200 transition-colors"
-        >
-          📷
-        </button>
-        <input
-          ref="imageInput"
-          type="file"
-          accept="image/*"
-          class="hidden"
-          @change="handleImageSelect"
-        />
-        
         <!-- 输入框 -->
         <div class="flex-1 relative">
           <textarea

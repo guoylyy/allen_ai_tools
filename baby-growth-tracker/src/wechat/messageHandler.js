@@ -1,6 +1,8 @@
 const xml2js = require('xml2js');
+const axios = require('axios');
 const WechatAPI = require('./api');
 const db = require('../database/connection');
+const QiniuService = require('../services/qiniuService');
 
 class MessageHandler {
     // 解析 XML 消息
@@ -27,7 +29,14 @@ class MessageHandler {
 
     // 处理消息
     static async handle(message) {
-        const { FromUserName, ToUserName, MsgType, Content, Event, EventKey } = message;
+        const { FromUserName, ToUserName, MsgType, Content, Event, EventKey, MediaId, PicUrl } = message;
+        
+        console.log('[微信消息] 类型:', MsgType);
+
+        // 图片消息
+        if (MsgType === 'image') {
+            return await this.handleImageMessage(FromUserName, ToUserName, MediaId);
+        }
 
         // 文本消息
         if (MsgType === 'text') {
@@ -46,6 +55,86 @@ class MessageHandler {
             MsgType: 'text',
             Content: '欢迎关注路谦成长记！\n\n请直接输入记录内容，例如：\n- 睡觉 14:00-16:00\n- 吃饭 奶粉 150ml\n- 玩耍 开心 1 小时'
         };
+    }
+    
+    // 处理图片消息
+    static async handleImageMessage(fromUser, toUser, mediaId) {
+        console.log('[图片消息] MediaId:', mediaId);
+        
+        try {
+            // 1. 通过微信 API 下载图片
+            const accessToken = await WechatAPI.getAccessToken();
+            const imageUrl = `https://api.weixin.qq.com/cgi-bin/media/get?access_token=${accessToken}&media_id=${mediaId}`;
+            
+            console.log('[图片消息] 下载图片 URL:', imageUrl);
+            
+            // 下载图片
+            const response = await axios.get(imageUrl, {
+                responseType: 'arraybuffer'
+            });
+            
+            const imageBuffer = Buffer.from(response.data);
+            console.log('[图片消息] 图片大小:', imageBuffer.length, 'bytes');
+            
+            // 2. 上传到七牛云
+            const key = QiniuService.generateKey('album');
+            const result = await QiniuService.uploadFile(imageBuffer, key);
+            
+            console.log('[图片消息] 上传成功:', result.url);
+            
+            // 3. 保存到数据库
+            const openid = fromUser;
+            
+            // 获取用户信息
+            let user;
+            try {
+                const [users] = await db.connection.query(
+                    'SELECT * FROM users WHERE openid = ?',
+                    [openid]
+                );
+                user = users[0];
+            } catch (e) {
+                console.error('[图片消息] 获取用户失败:', e);
+            }
+            
+            // 获取当前孩子ID
+            let childId = 1;
+            if (user && user.current_child_id) {
+                childId = user.current_child_id;
+            } else {
+                const [children] = await db.connection.query(
+                    'SELECT id FROM children LIMIT 1'
+                );
+                if (children.length > 0) {
+                    childId = children[0].id;
+                }
+            }
+            
+            // 保存到相册
+            await db.addAlbumPhoto({
+                url: result.url,
+                description: '通过微信上传',
+                child_id: childId,
+                openid: openid
+            });
+            
+            console.log('[图片消息] 保存成功');
+            
+            return {
+                ToUserName: fromUser,
+                FromUserName: toUser,
+                MsgType: 'text',
+                Content: '📸 照片已保存到相册！\n\n查看路径：首页 > 相册\n\n也可以继续发送照片或输入其他记录～'
+            };
+        } catch (error) {
+            console.error('[图片消息] 处理失败:', error);
+            return {
+                ToUserName: fromUser,
+                FromUserName: toUser,
+                MsgType: 'text',
+                Content: '😟 照片保存失败，请稍后重试～\n\n或者点击底部菜单「相册」查看已有照片'
+            };
+        }
     }
 
     // 处理文本消息
@@ -107,7 +196,7 @@ class MessageHandler {
 • 查询 / 今天 - 查看今日记录
 • 昨天 - 查看昨日记录
 
-输入任意内容，我会智能识别并记录！`
+发送照片可以保存到相册哦！`
             };
         }
 
@@ -116,7 +205,7 @@ class MessageHandler {
             ToUserName: fromUser,
             FromUserName: toUser,
             MsgType: 'text',
-            Content: '我没太理解，您可以：\n1. 直接输入记录内容（如：睡觉 14:00-16:00）\n2. 输入「查询」查看记录\n3. 输入「帮助」查看更多功能'
+            Content: '我没太理解，您可以：\n1. 直接输入记录内容（如：睡觉 14:00-16:00）\n2. 输入「查询」查看记录\n3. 输入「帮助」查看更多功能\n4. 发送照片保存到相册'
         };
     }
 
@@ -132,7 +221,8 @@ class MessageHandler {
 这是一个记录宝宝成长的小工具，您可以：
 1. 直接输入记录内容（如：睡觉 14:00-16:00）
 2. 点击底部菜单快速记录
-3. 输入「帮助」查看更多功能
+3. 发送照片保存到相册
+4. 输入「帮助」查看更多功能
 
 让我们一起记录宝宝的成长点滴！`
             };
@@ -215,11 +305,6 @@ class MessageHandler {
         }
 
         // 吃饭记录
-        // 格式1: 吃饭90ml, 吃饭150ml (数字紧跟吃饭或只有空格分隔) -> content=null
-        // 格式2: 吃饭 辅食 150ml (空格+内容+空格+数字) -> content=辅食
-        // 格式3: 吃饭 一碗 (空格+内容，没有数字) -> content=一碗, value=1
-
-        // 先尝试匹配"吃饭 + 数字"格式（数字紧跟吃饭或只有空格分隔）
         const eatMatch = content.match(/吃饭\s*(\d+)(ml|克|碗)?/);
         if (eatMatch) {
             return {
@@ -231,7 +316,7 @@ class MessageHandler {
             };
         }
 
-        // 尝试匹配"吃饭 + 内容 + 数字"格式（内容后面有空格+数字）
+        // 尝试匹配"吃饭 + 内容 + 数字"格式
         const eatWithContentMatch = content.match(/吃饭\s+(\S+)\s+(\d+)(ml|克|碗)?/);
         if (eatWithContentMatch) {
             return {
@@ -243,22 +328,9 @@ class MessageHandler {
             };
         }
 
-        // 尝试匹配"吃饭 + 内容 + 数字"格式（内容与数字之间无空格，如：吃饭奶粉90ml）
-        const eatNoSpaceMatch = content.match(/吃饭(\D+)(\d+)(ml|克|碗)?/);
-        if (eatNoSpaceMatch) {
-            return {
-                type: 'eat',
-                content: eatNoSpaceMatch[1].trim(),
-                duration: null,
-                value: parseInt(eatNoSpaceMatch[2]),
-                emotion: null
-            };
-        }
-
-        // 尝试匹配"吃饭 + 内容"格式（只有内容，没有数字，如：一碗、奶粉）
+        // 尝试匹配"吃饭 + 内容"格式（只有内容，没有数字）
         const eatOnlyContentMatch = content.match(/吃饭\s+(.+)/);
         if (eatOnlyContentMatch) {
-            // 默认value为1
             return {
                 type: 'eat',
                 content: eatOnlyContentMatch[1],

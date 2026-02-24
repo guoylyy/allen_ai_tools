@@ -154,6 +154,10 @@ function handleLogout() {
           <span class="text-xl">🏠</span>
           <span class="text-xs mt-1">首页</span>
         </router-link>
+        <router-link to="/album" class="flex flex-col items-center p-2 text-gray-500">
+          <span class="text-xl">📸</span>
+          <span class="text-xs mt-1">相册</span>
+        </router-link>
         <router-link to="/report" class="flex flex-col items-center p-2 text-gray-500">
           <span class="text-xl">📊</span>
           <span class="text-xs mt-1">报表</span>
