@@ -184,12 +184,16 @@ async function handlePhotoSelect(event) {
 function openPreview(url) {
   previewUrl.value = url
   showPreview.value = true
+  // 禁止背景滚动
+  document.body.style.overflow = 'hidden'
 }
 
 // 关闭图片预览
 function closePreview() {
   showPreview.value = false
   previewUrl.value = ''
+  // 恢复滚动
+  document.body.style.overflow = ''
 }
 
 // 格式化日期
@@ -212,7 +216,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen pb-20">
+  <div style="min-height: 100vh; padding-bottom: 80px;">
     <!-- 头部 -->
     <header class="bg-white border-b sticky top-0 z-10">
       <div class="flex items-center p-4">
@@ -324,8 +328,4 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-/* 防止预览弹窗背景滚动 */
-:global(body) {
-  overflow: hidden;
-}
 </style>
