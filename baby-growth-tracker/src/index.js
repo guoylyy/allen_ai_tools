@@ -824,6 +824,26 @@ function parseNaturalLanguageLocal(text) {
             result.recorded_at = getLocalISOString(targetDate);
         }
     }
+    // 解析排尿
+    else if (text.includes('排尿') || text.includes('小便') || text.includes('尿尿') || text.includes('拉尿') || text.includes('尿了') || text.includes('嘘嘘') || text.includes('小解')) {
+        result.type = 'pee';
+        result.typeName = '排尿';
+        result.message = '排尿数据已记录';
+        
+        // 解析时间
+        const timeInfo = parseTime(dateInfo.text);
+        if (timeInfo) {
+            targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
+            console.log(`[排尿记录] 时间: ${timeInfo.hour}点${timeInfo.minute ? timeInfo.minute + '分' : ''}`);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
+        }
+    }
     // 如果没有匹配到任何类型，也使用当前时间
     else {
         targetDate = new Date();

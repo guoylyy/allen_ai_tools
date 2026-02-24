@@ -19,7 +19,8 @@ const RECORD_TYPES = {
     study: { name: '学习', keywords: ['学习', '学', '识字', '认字', '阅读', '绘本'] },
     supplement: { name: '营养补充', keywords: ['辅食', '补钙', '补锌', '补充', '营养', '维生素', 'DHA'] },
     milestone: { name: '里程碑', keywords: ['里程碑', '第一次', '学会', '达成'] },
-    poop: { name: '排便', keywords: ['排便', '大便', '臭臭', '拉臭', '拉了', '拉屎', '尿布', '换尿布'] }
+    poop: { name: '排便', keywords: ['排便', '大便', '臭臭', '拉臭', '拉了', '拉屎', '尿布', '换尿布'] },
+    pee: { name: '排尿', keywords: ['排尿', '小便', '尿尿', '拉尿', '尿了', '嘘嘘', '小解'] }
 };
 
 // AI 提示词模板
@@ -37,7 +38,7 @@ ${Object.values(RECORD_TYPES).map(t => `- ${t.name}: ${t.keywords.join(', ')}`).
 
 请以 JSON 格式返回结果：
 {
-    "type": "类型代码(sleep/eat/play/study/supplement/milestone/poop)",
+    "type": "类型代码(sleep/eat/play/study/supplement/milestone/poop/pee)",
     "typeName": "类型名称",
     "recorded_at": "记录时间(ISO格式，如果没明确时间则为当前时间)",
     "duration": 时长(分钟，数字),

@@ -70,7 +70,8 @@ const filterTabs = ref([
   { id: 'play', name: '玩耍' },
   { id: 'study', name: '学习' },
   { id: 'supplement', name: '补剂' },
-  { id: 'poop', name: '排便' }
+  { id: 'poop', name: '排便' },
+  { id: 'pee', name: '排尿' }
 ])
 const selectedFilter = ref('all')
 
@@ -90,7 +91,8 @@ const recordTypes = [
   { id: 'play', name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
   { id: 'study', name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
   { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
-  { id: 'poop', name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' }
+  { id: 'poop', name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' },
+  { id: 'pee', name: '排尿', icon: '💧', color: 'bg-cyan-100 text-cyan-600' }
 ]
 
 const currentRecordType = computed(() => 
@@ -391,7 +393,8 @@ const typeMap = {
   study: { name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
   supplement: { name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
   milestone: { name: '里程碑', icon: '🎉', color: 'bg-pink-100 text-pink-600' },
-  poop: { name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' }
+  poop: { name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' },
+  pee: { name: '排尿', icon: '💧', color: 'bg-cyan-100 text-cyan-600' }
 }
 
 // 需要开始结束时间的类型
@@ -473,7 +476,7 @@ function calculateDuration() {
 
 // 获取记录的recorded_at时间
 function getRecordedAt() {
-  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement' || manualType.value === 'poop') {
+  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement' || manualType.value === 'poop' || manualType.value === 'pee') {
     return `${manualDate.value}T${manualStartTime.value}:00`
   } else {
     const now = new Date()
@@ -531,6 +534,12 @@ async function submitManualRecord() {
         content += `，${manualRemark.value}`
       }
       value = selectedPoopAmount.value ? parseInt(selectedPoopAmount.value) : null
+    } else if (manualType.value === 'pee') {
+      // 排尿记录
+      content = '排尿'
+      if (manualRemark.value) {
+        content += `，${manualRemark.value}`
+      }
     } else {
       if (manualRemark.value) {
         content = manualRemark.value
@@ -1492,6 +1501,18 @@ onUnmounted(() => {
                   大量
                 </button>
               </div>
+            </div>
+          </template>
+          
+          <!-- 排尿时间选择 -->
+          <template v-if="manualType === 'pee'">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
+              <input
+                type="time"
+                v-model="manualStartTime"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
             </div>
           </template>
           
