@@ -38,6 +38,7 @@ const manualRemark = ref('')
 const isManualSubmitting = ref(false)
 const selectedSupplement = ref('')
 const customSupplement = ref('')
+const selectedPoopAmount = ref('') // 排便量：1=少量, 2=中等, 3=大量
 
 // 修改弹窗相关（完整手动录入形式）
 const showEditModal = ref(false)
@@ -68,7 +69,8 @@ const filterTabs = ref([
   { id: 'eat', name: '吃饭' },
   { id: 'play', name: '玩耍' },
   { id: 'study', name: '学习' },
-  { id: 'supplement', name: '补剂' }
+  { id: 'supplement', name: '补剂' },
+  { id: 'poop', name: '排便' }
 ])
 const selectedFilter = ref('all')
 
@@ -87,7 +89,8 @@ const recordTypes = [
   { id: 'eat', name: '吃饭', icon: '🍼', color: 'bg-orange-100 text-orange-600' },
   { id: 'play', name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
   { id: 'study', name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
-  { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' }
+  { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
+  { id: 'poop', name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' }
 ]
 
 const currentRecordType = computed(() => 
@@ -387,7 +390,8 @@ const typeMap = {
   play: { name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
   study: { name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
   supplement: { name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
-  milestone: { name: '里程碑', icon: '🎉', color: 'bg-pink-100 text-pink-600' }
+  milestone: { name: '里程碑', icon: '🎉', color: 'bg-pink-100 text-pink-600' },
+  poop: { name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' }
 }
 
 // 需要开始结束时间的类型
@@ -441,6 +445,7 @@ function selectManualType(type) {
   manualAmount.value = ''
   selectedSupplement.value = ''
   customSupplement.value = ''
+  selectedPoopAmount.value = ''
   const typeInfo = recordTypes.find(t => t.id === type)
   if (typeInfo) {
     manualRemark.value = typeInfo.name
@@ -468,7 +473,7 @@ function calculateDuration() {
 
 // 获取记录的recorded_at时间
 function getRecordedAt() {
-  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement') {
+  if (typesWithTimeRange.includes(manualType.value) || manualType.value === 'eat' || manualType.value === 'supplement' || manualType.value === 'poop') {
     return `${manualDate.value}T${manualStartTime.value}:00`
   } else {
     const now = new Date()
@@ -488,6 +493,8 @@ async function submitManualRecord() {
     const recordedAt = getRecordedAt()
     
     let content = ''
+    let value = null
+    
     if (typesWithTimeRange.includes(manualType.value)) {
       content = `${manualStartTime.value}到${manualEndTime.value}`
       if (manualRemark.value) {
@@ -503,6 +510,7 @@ async function submitManualRecord() {
       if (!content) {
         content = '吃饭'
       }
+      value = manualAmount.value ? parseFloat(manualAmount.value) : null
     } else if (manualType.value === 'supplement') {
       const supplementName = selectedSupplement.value || customSupplement.value
       if (supplementName) {
@@ -514,6 +522,15 @@ async function submitManualRecord() {
       if (!content) {
         content = '补剂'
       }
+    } else if (manualType.value === 'poop') {
+      // 排便记录
+      const poopAmountMap = { 1: '少量', 2: '中等', 3: '大量' }
+      const amountName = poopAmountMap[selectedPoopAmount.value] || ''
+      content = amountName || '排便'
+      if (manualRemark.value) {
+        content += `，${manualRemark.value}`
+      }
+      value = selectedPoopAmount.value ? parseInt(selectedPoopAmount.value) : null
     } else {
       if (manualRemark.value) {
         content = manualRemark.value
@@ -525,7 +542,7 @@ async function submitManualRecord() {
       recorded_at: recordedAt,
       content: content,
       duration: duration,
-      value: manualAmount.value ? parseFloat(manualAmount.value) : null,
+      value: value,
       child_id: userStore.currentChild?.id || 1
     })
     
@@ -1431,6 +1448,50 @@ onUnmounted(() => {
                 placeholder="或输入其他补剂名称"
                 class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
+            </div>
+          </template>
+          
+          <!-- 排便量选择 -->
+          <template v-if="manualType === 'poop'">
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">时间</label>
+              <input
+                type="time"
+                v-model="manualStartTime"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </div>
+            <div class="p-4 border-b">
+              <label class="block text-sm font-medium text-gray-700 mb-2">排便量</label>
+              <div class="flex gap-3">
+                <button
+                  @click="selectedPoopAmount = '1'"
+                  class="flex-1 py-3 rounded-lg text-sm font-medium transition-colors"
+                  :class="selectedPoopAmount === '1' 
+                    ? 'bg-yellow-500 text-white' 
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'"
+                >
+                  少量
+                </button>
+                <button
+                  @click="selectedPoopAmount = '2'"
+                  class="flex-1 py-3 rounded-lg text-sm font-medium transition-colors"
+                  :class="selectedPoopAmount === '2' 
+                    ? 'bg-yellow-500 text-white' 
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'"
+                >
+                  中等
+                </button>
+                <button
+                  @click="selectedPoopAmount = '3'"
+                  class="flex-1 py-3 rounded-lg text-sm font-medium transition-colors"
+                  :class="selectedPoopAmount === '3' 
+                    ? 'bg-yellow-500 text-white' 
+                    : 'bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100'"
+                >
+                  大量
+                </button>
+              </div>
             </div>
           </template>
           

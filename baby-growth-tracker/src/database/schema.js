@@ -20,7 +20,7 @@ const migrateDatabase = async (connection) => {
     }
   }
 
-  // 修改 records 表的 type 字段，添加 supplement 类型
+  // 修改 records 表的 type 字段，添加 supplement 和 poop 类型
   try {
     // 先检查当前 type 字段的定义
     const [columns] = await connection.query(`SHOW COLUMNS FROM records LIKE 'type'`);
@@ -28,13 +28,13 @@ const migrateDatabase = async (connection) => {
       const currentType = columns[0].Type;
       console.log('当前 type 字段类型:', currentType);
       
-      // 如果不包含 supplement，尝试修改
-      if (!currentType.includes('supplement')) {
-        // 修改 ENUM 类型，添加 supplement，移除 emotion
-        await connection.query(`ALTER TABLE records MODIFY COLUMN type ENUM('sleep', 'eat', 'play', 'study', 'supplement', 'milestone') NOT NULL`);
-        console.log('records.type 字段更新成功，添加了 supplement 类型');
+      // 如果不包含 poop，添加 poop 类型
+      if (!currentType.includes('poop')) {
+        // 修改 ENUM 类型，添加 poop
+        await connection.query(`ALTER TABLE records MODIFY COLUMN type ENUM('sleep', 'eat', 'play', 'study', 'supplement', 'milestone', 'poop') NOT NULL`);
+        console.log('records.type 字段更新成功，添加了 poop 类型');
       } else {
-        console.log('records.type 字段已包含 supplement，跳过');
+        console.log('records.type 字段已包含 poop，跳过');
       }
     }
   } catch (error) {

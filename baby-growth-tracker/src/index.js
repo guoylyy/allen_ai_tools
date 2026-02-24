@@ -792,6 +792,38 @@ function parseNaturalLanguageLocal(text) {
         targetDate.setFullYear(currentYear);
         result.recorded_at = getLocalISOString(targetDate);
     }
+    // 解析排便 - 需要在"拉"之前匹配"排便"或"大便"或"臭臭"等
+    else if (text.includes('排便') || text.includes('大便') || text.includes('臭臭') || text.includes('拉臭') || text.includes('拉了') || text.includes('拉屎') || text.includes('尿布') || text.includes('换尿布')) {
+        result.type = 'poop';
+        result.typeName = '排便';
+        result.message = '排便数据已记录';
+        
+        // 解析排便量 - 使用 value 字段存储：1=少量, 2=中等, 3=大量
+        if (text.includes('大量') || text.includes('多') || text.includes('很多') || text.includes('大大') || text.includes('稠')) {
+            result.value = 3;
+            result.message = '排便数据已记录（大量）';
+        } else if (text.includes('中等') || text.includes('正常') || text.includes('一般')) {
+            result.value = 2;
+            result.message = '排便数据已记录（中等）';
+        } else if (text.includes('少量') || text.includes('少') || text.includes('一点点') || text.includes('一点') || text.includes('稀')) {
+            result.value = 1;
+            result.message = '排便数据已记录（少量）';
+        }
+        
+        // 解析时间
+        const timeInfo = parseTime(dateInfo.text);
+        if (timeInfo) {
+            targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
+            console.log(`[排便记录] 时间: ${timeInfo.hour}点${timeInfo.minute ? timeInfo.minute + '分' : ''}, 量: ${result.value}`);
+        } else {
+            // 如果没有识别到具体时间，使用当前时间
+            targetDate = new Date();
+            targetDate.setFullYear(currentYear);
+            result.recorded_at = getLocalISOString(targetDate);
+        }
+    }
     // 如果没有匹配到任何类型，也使用当前时间
     else {
         targetDate = new Date();
