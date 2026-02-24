@@ -30,30 +30,74 @@ function triggerUpload() {
   document.getElementById('photo-upload')?.click()
 }
 
+// 压缩图片
+function compressImage(file, maxWidth = 1200, quality = 0.8) {
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        let width = img.width
+        let height = img.height
+        
+        // 如果图片大于最大宽度，按比例缩放
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+        
+        canvas.width = width
+        canvas.height = height
+        
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0, width, height)
+        
+        // 转换为 blob
+        canvas.toBlob((blob) => {
+          resolve(new File([blob], file.name, { type: 'image/jpeg' }))
+        }, 'image/jpeg', quality)
+      }
+      img.src = e.target.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 // 处理图片选择
 async function handlePhotoSelect(event) {
   const file = event.target.files?.[0]
   if (!file) return
   
-  // 预览本地图片
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    photos.value.unshift({
-      id: Date.now(),
-      url: e.target.result,
-      created_at: new Date().toISOString(),
-      local: true
-    })
-  }
-  reader.readAsDataURL(file)
-  
-  // 实际上传到服务器（七牛云）
+  // 压缩图片
   isUploading.value = true
-  const formData = new FormData()
-  formData.append('image', file)
-  formData.append('description', '通过相册上传')
+  let uploadFile = file
   
   try {
+    // 如果文件大于 500KB，先压缩
+    if (file.size > 500 * 1024) {
+      console.log('图片过大，开始压缩...')
+      uploadFile = await compressImage(file, 1200, 0.7)
+      console.log(`压缩后大小: ${(uploadFile.size / 1024).toFixed(2)}KB`)
+    }
+    
+    // 预览本地图片（使用原图预览）
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      photos.value.unshift({
+        id: Date.now(),
+        url: e.target.result,
+        created_at: new Date().toISOString(),
+        local: true
+      })
+    }
+    reader.readAsDataURL(file)
+    
+    // 实际上传到服务器（七牛云）
+    const formData = new FormData()
+    formData.append('image', uploadFile)
+    formData.append('description', '通过相册上传')
+    
     const result = await api.uploadImage(formData)
     console.log('上传结果:', result)
     
