@@ -536,15 +536,16 @@ class Database {
         return result.affectedRows;
     }
 
-    // 获取相册照片
-    async getAlbumPhotos(childId) {
+    // 获取相册照片（支持分页）
+    async getAlbumPhotos(childId, options = {}) {
+        const { limit = 30, offset = 0 } = options;
         const sql = `
             SELECT * FROM album_photos 
             WHERE child_id = ?
             ORDER BY created_at DESC
-            LIMIT 100
+            LIMIT ? OFFSET ?
         `;
-        const [photos] = await this.connection.query(sql, [childId]);
+        const [photos] = await this.connection.query(sql, [childId, limit, offset]);
         return photos;
     }
 

@@ -928,9 +928,12 @@ app.get('/api/upload/token', (req, res) => {
 // ----- 相册相关 -----
 app.get('/api/album/photos', async (req, res) => {
     try {
-        const { child_id } = req.query;
+        const { child_id, limit = 30, offset = 0 } = req.query;
         const childId = child_id || 1;
-        const photos = await db.getAlbumPhotos(childId);
+        const photos = await db.getAlbumPhotos(childId, {
+            limit: parseInt(limit),
+            offset: parseInt(offset)
+        });
         apiResponse(res, true, photos);
     } catch (error) {
         apiResponse(res, false, null, error.message);

@@ -1,28 +1,87 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 
 const router = useRouter()
 const photos = ref([])
 const isLoading = ref(false)
+const isLoadingMore = ref(false)
 const isUploading = ref(false)
+const hasMore = ref(true)
+const LIMIT = 30
 
 // 图片预览弹窗
 const showPreview = ref(false)
 const previewUrl = ref('')
 
-// 加载相册照片
+// 加载相册照片（首次加载）
 async function loadPhotos() {
   isLoading.value = true
+  hasMore.value = true
   try {
     const result = await api.getAlbumPhotos({})
     photos.value = result || []
+    hasMore.value = result?.length >= LIMIT
   } catch (error) {
     console.error('加载照片失败:', error)
   } finally {
     isLoading.value = false
   }
+}
+
+// 加载更多照片（无限滚动）
+async function loadMorePhotos() {
+  if (isLoadingMore.value || !hasMore.value) return
+  
+  isLoadingMore.value = true
+  
+  // 计算偏移量
+  const offset = photos.value.length
+  
+  try {
+    // 使用 offset 实现分页
+    const result = await api.getAlbumPhotos({ limit: LIMIT, offset })
+    const newPhotos = result || []
+    
+    if (newPhotos.length > 0) {
+      // 过滤掉已存在的照片（根据ID去重）
+      const existingIds = new Set(photos.value.map(p => p.id))
+      const uniquePhotos = newPhotos.filter(p => !existingIds.has(p.id))
+      photos.value = [...photos.value, ...uniquePhotos]
+    }
+    
+    hasMore.value = newPhotos.length >= LIMIT
+  } catch (error) {
+    console.error('加载更多照片失败:', error)
+  } finally {
+    isLoadingMore.value = false
+  }
+}
+
+// 监听滚动（带节流）
+let isScrolling = false
+function handleScroll() {
+  if (isScrolling) return
+  
+  isScrolling = true
+  setTimeout(() => {
+    isScrolling = false
+    
+    const scrollTop = window.scrollY || document.documentElement.scrollTop
+    const windowHeight = window.innerHeight
+    const documentHeight = document.documentElement.scrollHeight
+    
+    // 距离底部 300px 时开始加载（移动端更容易触发）
+    if (scrollTop + windowHeight >= documentHeight - 300) {
+      loadMorePhotos()
+    }
+  }, 200)
+}
+
+// 刷新相册
+async function refreshPhotos() {
+  await loadPhotos()
 }
 
 // 触发图片上传
@@ -144,6 +203,11 @@ function formatDate(date) {
 
 onMounted(() => {
   loadPhotos()
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
@@ -205,6 +269,19 @@ onMounted(() => {
             alt="宝宝照片"
           />
         </div>
+      </div>
+      
+      <!-- 加载更多 -->
+      <div v-if="hasMore && photos.length > 0" class="text-center py-4">
+        <div v-if="isLoadingMore" class="inline-flex items-center gap-2 text-gray-400">
+          <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
+          <span>加载更多...</span>
+        </div>
+      </div>
+      
+      <!-- 没有更多了 -->
+      <div v-else-if="!hasMore && photos.length > 0" class="text-center py-4 text-gray-400 text-sm">
+        没有更多照片了
       </div>
     </div>
 
