@@ -4,3 +4,4 @@ restart.sh
 .env
 .venv
 *.sh
+node_modules/
