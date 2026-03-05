@@ -1,0 +1,11 @@
+数据库初始化完成
+表: [
+  'orders',
+  'products',
+  'processes',
+  'work_orders',
+  'workers',
+  'production_records',
+  'logs'
+]
+🚀 华丰电梯生产管理系统 API 已启动: http://localhost:3001
