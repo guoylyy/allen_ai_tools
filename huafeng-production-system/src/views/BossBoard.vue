@@ -1,7 +1,9 @@
 <template>
-  <div class="dashboard">
+  <div class="boss-board">
+    <h1 class="page-title" style="color: #fff;">📺 老板看板</h1>
+
     <!-- 顶部统计 -->
-    <div class="top-stats">
+    <div class="top-stats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
       <div class="stat-card" v-for="stat in topStats" :key="stat.label">
         <div class="stat-value" :style="{ color: stat.color }">{{ stat.value }}</div>
         <div class="stat-label">{{ stat.label }}</div>
@@ -9,7 +11,7 @@
     </div>
 
     <!-- 工序进度 -->
-    <div class="process-grid">
+    <div class="process-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px;">
       <div class="process-card" v-for="proc in processStats" :key="proc.id" :style="{ borderColor: proc.color }">
         <div class="process-header">
           <span class="process-name">{{ proc.name }}</span>
@@ -29,22 +31,22 @@
             <span class="value working">{{ proc.working }}</span>
           </div>
         </div>
-        <div class="progress-line">
+        <div class="progress-bar">
           <div class="progress-fill" :style="{ width: proc.percent + '%', background: proc.color }"></div>
         </div>
         <div class="process-footer">
-          <span>负责: {{ proc.worker || '待分配' }}</span>
+          <span>负责: {{ proc.worker }}</span>
           <span>设备: {{ proc.device }}</span>
         </div>
       </div>
     </div>
 
     <!-- 底部数据 -->
-    <div class="bottom-panel">
-      <!-- 今日生产列表 -->
-      <div class="panel production-list">
-        <h3>🚧 正在进行</h3>
-        <div class="list-content">
+    <div class="bottom-panel" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+      <!-- 正在进行 -->
+      <div class="panel card">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px;">🚧 正在进行</h3>
+        <div class="production-list">
           <div class="production-item" v-for="item in productionList" :key="item.id">
             <div class="item-info">
               <span class="part-no">{{ item.partNo }}</span>
@@ -54,22 +56,22 @@
               <span>{{ item.name }}</span>
               <span class="quantity">× {{ item.quantity }}</span>
             </div>
-            <div class="item-progress">
-              <div class="mini-progress" :style="{ width: item.progress + '%', background: item.color }"></div>
+            <div class="progress-bar" style="height: 4px;">
+              <div class="progress-fill" :style="{ width: item.progress + '%', background: item.color }"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 员工工作状态 -->
-      <div class="panel workers-status">
-        <h3>👥 员工状态</h3>
-        <div class="workers-grid">
+      <!-- 员工状态 -->
+      <div class="panel card">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px;">👥 员工状态</h3>
+        <div class="workers-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
           <div class="worker-card" v-for="worker in workers" :key="worker.id">
             <div class="worker-avatar">{{ worker.name[0] }}</div>
             <div class="worker-info">
               <div class="worker-name">{{ worker.name }}</div>
-              <div class="worker-task">{{ worker.currentTask || '空闲' }}</div>
+              <div class="worker-task">{{ worker.currentTask }}</div>
             </div>
             <div class="worker-status" :class="worker.status">{{ worker.status === 'working' ? '工作中' : '休息' }}</div>
           </div>
@@ -77,9 +79,9 @@
       </div>
 
       <!-- 今日汇总 -->
-      <div class="panel today-summary">
-        <h3>📊 今日汇总</h3>
-        <div class="summary-stats">
+      <div class="panel card">
+        <h3 style="margin: 0 0 15px 0; font-size: 16px;">📊 今日汇总</h3>
+        <div class="summary-stats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
           <div class="summary-item">
             <div class="summary-value">{{ todayStats.totalOutput }}</div>
             <div class="summary-label">总产出</div>
@@ -97,8 +99,8 @@
             <div class="summary-label">效率</div>
           </div>
         </div>
-        <div class="timeline">
-          <h4>时间线</h4>
+        <div class="timeline" style="margin-top: 20px;">
+          <h4 style="margin: 0 0 10px 0; font-size: 13px; color: var(--foreground-light);">时间线</h4>
           <div class="timeline-item" v-for="event in timeline" :key="event.time">
             <span class="time">{{ event.time }}</span>
             <span class="event">{{ event.content }}</span>
@@ -110,13 +112,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-
+import { ref } from 'vue'
 const topStats = ref([
-  { label: '总订单', value: 12, color: '#00f0ff' },
-  { label: '进行中', value: 8, color: '#ff00ff' },
-  { label: '今日产出', value: 245, color: '#00ff9f' },
-  { label: '员工在线', value: 28, color: '#ffd700' }
+  { label: '总订单', value: 12, color: '#C29B40' },
+  { label: '进行中', value: 8, color: '#3b82f6' },
+  { label: '今日产出', value: 245, color: '#22c55e' },
+  { label: '员工在线', value: 28, color: '#f59e0b' }
 ])
 
 const processStats = ref([
@@ -124,19 +125,15 @@ const processStats = ref([
   { id: 'shuchong', name: '数冲', todayCount: 28, completed: 15, working: 10, percent: 54, color: '#feca57', worker: '李师傅', device: '数冲机-02' },
   { id: 'jiguang', name: '激光', todayCount: 120, completed: 85, working: 20, percent: 71, color: '#48dbfb', worker: '王师傅', device: '激光机-01' },
   { id: 'zhewan', name: '折弯', todayCount: 95, completed: 60, working: 25, percent: 63, color: '#1dd1a1', worker: '赵师傅', device: '折弯机-03' },
-  { id: 'jiaogangxian', name: '角钢线', todayCount: 18, completed: 18, working: 0, percent: 100, color: '#5f27cd', worker: '钱师傅', device: '角钢线-01' },
-  { id: 'qieguanji', name: '切管机', todayCount: 56, completed: 40, working: 10, percent: 71, color: '#ff9ff3', worker: '孙师傅', device: '切管机-02' },
   { id: 'hanjie', name: '焊接', todayCount: 180, completed: 100, working: 50, percent: 56, color: '#00d2d3', worker: '周师傅', device: '焊接站-04' },
-  { id: 'pentu', name: '喷涂', todayCount: 88, completed: 55, working: 20, percent: 63, color: '#54a0ff', worker: '吴师傅', device: '喷涂房-01' },
-  { id: 'zuzhuang', name: '组装', todayCount: 35, completed: 12, working: 15, percent: 34, color: '#00cec9', worker: '郑师傅', device: '组装线-01' }
+  { id: 'pentu', name: '喷涂', todayCount: 88, completed: 55, working: 20, percent: 63, color: '#54a0ff', worker: '吴师傅', device: '喷涂房-01' }
 ])
 
 const productionList = ref([
   { id: 1, partNo: 'HED0E022C01P', name: '对重悬臂角铁(左件)', process: '焊接', quantity: 13, progress: 80, color: '#00d2d3' },
   { id: 2, partNo: 'HED2A079C03', name: '慢层门板', process: '喷涂', quantity: 8, progress: 60, color: '#54a0ff' },
   { id: 3, partNo: 'HED3T058101', name: '上横档', process: '切管机', quantity: 2, progress: 45, color: '#ff9ff3' },
-  { id: 4, partNo: 'HED0L024C03P', name: '轿厢缓冲器底座', process: '焊接', quantity: 2, progress: 90, color: '#00d2d3' },
-  { id: 5, partNo: 'HED2A082C01', name: '右快层门板', process: '折弯', quantity: 4, progress: 35, color: '#1dd1a1' }
+  { id: 4, partNo: 'HED0L024C03P', name: '轿厢缓冲器底座', process: '焊接', quantity: 2, progress: 90, color: '#00d2d3' }
 ])
 
 const workers = ref([
@@ -165,66 +162,49 @@ const timeline = ref([
 ])
 </script>
 
-<style scoped>
-.dashboard {
-  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 100%);
-  min-height: 100vh;
-  padding: 20px;
+<style>
+.boss-board {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+  min-height: calc(100vh - 100px);
+  padding: 30px;
+  border-radius: 12px;
+}
+
+.boss-board .page-title {
   color: #fff;
-  font-family: 'Orbitron', 'Rajdhani', sans-serif;
+  border-bottom: 2px solid #C29B40;
+  padding-bottom: 12px;
 }
 
 /* 顶部统计 */
-.top-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
+.top-stats .stat-card {
+  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+  border: 1px solid #C29B40;
+  border-radius: 12px;
   padding: 24px;
   text-align: center;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 
-.stat-value {
-  font-size: 48px;
-  font-weight: bold;
-  text-shadow: 0 0 20px currentColor;
-  animation: glow 2s ease-in-out infinite alternate;
+.top-stats .stat-value {
+  font-size: 42px;
+  font-weight: 700;
+  color: #C29B40;
+  text-shadow: 0 0 20px rgba(194, 155, 64, 0.5);
 }
 
-@keyframes glow {
-  from { text-shadow: 0 0 10px currentColor; }
-  to { text-shadow: 0 0 30px currentColor, 0 0 50px currentColor; }
-}
-
-.stat-label {
+.top-stats .stat-label {
   font-size: 14px;
-  color: rgba(255,255,255,0.6);
+  color: rgba(255,255,255,0.7);
   margin-top: 8px;
-  letter-spacing: 2px;
 }
 
-/* 工序网格 */
-.process-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
+/* 工序卡片 */
 .process-card {
-  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
+  border-left: 4px solid #C29B40;
+  border-radius: 12px;
   padding: 20px;
-  border-left: 4px solid;
 }
 
 .process-header {
@@ -235,143 +215,115 @@ const timeline = ref([
 }
 
 .process-name {
-  font-size: 20px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
 }
 
 .process-count {
-  font-size: 28px;
-  font-weight: bold;
-  color: #00f0ff;
+  font-size: 24px;
+  font-weight: 700;
+  color: #C29B40;
 }
 
 .process-body {
-  display: flex;
-  justify-content: space-between;
   margin-bottom: 15px;
 }
 
 .process-info {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .process-info .label {
-  display: block;
-  font-size: 11px;
   color: rgba(255,255,255,0.5);
-  margin-bottom: 4px;
+  font-size: 13px;
 }
 
 .process-info .value {
-  font-size: 16px;
-  font-weight: bold;
+  color: #fff;
+  font-weight: 500;
 }
 
-.process-info .value.completed { color: #00ff9f; }
-.process-info .value.working { color: #ffd700; }
-
-.progress-line {
-  height: 6px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 15px;
+.process-info .value.completed {
+  color: #22c55e;
 }
 
-.progress-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.5s ease;
-  box-shadow: 0 0 10px currentColor;
+.process-info .value.working {
+  color: #f59e0b;
 }
 
 .process-footer {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
   color: rgba(255,255,255,0.5);
+  font-size: 12px;
+  margin-top: 10px;
 }
 
 /* 底部面板 */
-.bottom-panel {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
-}
-
-.panel {
-  background: linear-gradient(145deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+.bottom-panel .panel {
+  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
   border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 20px;
 }
 
-.panel h3 {
-  margin: 0 0 15px 0;
+.bottom-panel h3 {
+  color: #fff;
   font-size: 16px;
-  letter-spacing: 2px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 15px;
   padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 /* 生产列表 */
 .production-item {
-  padding: 12px;
   background: rgba(255,255,255,0.03);
+  padding: 12px;
   border-radius: 8px;
   margin-bottom: 10px;
 }
 
-.item-info {
+.production-item .item-info {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 8px;
 }
 
-.part-no {
-  font-weight: bold;
-  color: #00f0ff;
+.production-item .part-no {
+  font-family: monospace;
+  font-size: 13px;
+  color: #C29B40;
+  font-weight: 600;
 }
 
 .process-tag {
+  font-size: 11px;
   padding: 2px 8px;
   border-radius: 4px;
-  font-size: 11px;
+  color: #000;
+  font-weight: 500;
 }
 
-.item-detail {
+.production-item .item-detail {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
   color: rgba(255,255,255,0.7);
+  font-size: 12px;
   margin-bottom: 8px;
 }
 
-.item-progress {
-  height: 4px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 2px;
-}
-
-.mini-progress {
-  height: 100%;
-  border-radius: 2px;
-}
-
-/* 员工状态 */
-.workers-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-
+/* 员工卡片 */
 .worker-card {
   display: flex;
   align-items: center;
-  padding: 10px;
+  gap: 10px;
   background: rgba(255,255,255,0.03);
+  padding: 10px;
   border-radius: 8px;
 }
 
@@ -379,12 +331,13 @@ const timeline = ref([
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #00f0ff, #ff00ff);
+  background: linear-gradient(135deg, #C29B40, #D4B56A);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
-  margin-right: 10px;
+  color: #000;
+  font-size: 14px;
 }
 
 .worker-info {
@@ -392,39 +345,33 @@ const timeline = ref([
 }
 
 .worker-name {
+  color: #fff;
   font-size: 13px;
-  font-weight: bold;
+  font-weight: 500;
 }
 
 .worker-task {
-  font-size: 11px;
   color: rgba(255,255,255,0.5);
+  font-size: 11px;
 }
 
 .worker-status {
-  font-size: 10px;
-  padding: 2px 8px;
+  font-size: 11px;
+  padding: 3px 8px;
   border-radius: 10px;
 }
 
 .worker-status.working {
-  background: rgba(0,255,159,0.2);
-  color: #00ff9f;
+  background: rgba(34,197,94,0.2);
+  color: #22c55e;
 }
 
 .worker-status.idle {
-  background: rgba(255,215,0,0.2);
-  color: #ffd700;
+  background: rgba(245,158,11,0.2);
+  color: #f59e0b;
 }
 
-/* 今日汇总 */
-.summary-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
+/* 汇总统计 */
 .summary-item {
   text-align: center;
   padding: 15px;
@@ -433,25 +380,29 @@ const timeline = ref([
 }
 
 .summary-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #00f0ff;
+  font-size: 28px;
+  font-weight: 700;
+  color: #C29B40;
 }
 
 .summary-value.warning {
-  color: #ffd700;
+  color: #f59e0b;
 }
 
 .summary-label {
-  font-size: 11px;
+  font-size: 12px;
   color: rgba(255,255,255,0.5);
   margin-top: 5px;
 }
 
+/* 时间线 */
+.timeline {
+  margin-top: 20px;
+}
+
 .timeline h4 {
-  margin: 0 0 10px 0;
-  font-size: 12px;
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
 }
 
 .timeline-item {
@@ -462,12 +413,25 @@ const timeline = ref([
 }
 
 .timeline-item .time {
-  color: #00f0ff;
+  color: #C29B40;
   width: 50px;
   flex-shrink: 0;
 }
 
 .timeline-item .event {
   color: rgba(255,255,255,0.7);
+}
+
+/* 进度条 */
+.boss-board .progress-bar {
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.boss-board .progress-fill {
+  height: 100%;
+  border-radius: 3px;
 }
 </style>

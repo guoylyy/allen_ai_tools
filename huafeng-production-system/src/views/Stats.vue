@@ -1,87 +1,109 @@
 <template>
   <div class="stats-page">
-    <!-- 统计概览 -->
-    <div class="stats-cards">
-      <div class="card">
-        <div class="label">本月完成产量</div>
-        <div class="value">1,280</div>
-        <div class="trend up">↑ 12%</div>
+    <h1 class="page-title">📈 效率统计</h1>
+
+    <!-- 时间筛选 -->
+    <div class="toolbar">
+      <div style="display: flex; gap: 10px;">
+        <button 
+          v-for="t in timeRanges" 
+          :key="t.value"
+          :class="['btn', currentRange === t.value ? 'btn-primary' : 'btn-outline']"
+          @click="currentRange = t.value"
+        >
+          {{ t.label }}
+        </button>
       </div>
-      <div class="card">
-        <div class="label">平均效率</div>
-        <div class="value">95%</div>
-        <div class="trend up">↑ 5%</div>
-      </div>
-      <div class="card">
-        <div class="label">最高产员工</div>
-        <div class="value">张三</div>
-        <div class="sub">156件</div>
-      </div>
-      <div class="card">
-        <div class="label">最優班组</div>
-        <div class="value">焊接组</div>
-        <div class="sub">完成率98%</div>
+      <div style="color: var(--foreground-light);">
+        数据更新: {{ updateTime }}
       </div>
     </div>
 
-    <!-- 工人效率排名 -->
-    <div class="section">
-      <h2>工人效率排名</h2>
-      <table class="data-table">
+    <!-- 统计卡片 -->
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 30px;">
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.totalOutput }}</div>
+        <div class="stat-label">总产量</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.qualifiedRate }}%</div>
+        <div class="stat-label">合格率</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.efficiency }}%</div>
+        <div class="stat-label">生产效率</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">{{ stats.onTimeRate }}%</div>
+        <div class="stat-label">准时交付率</div>
+      </div>
+    </div>
+
+    <!-- 图表区域 -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+      <!-- 产量趋势 -->
+      <div class="card">
+        <h3 style="margin: 0 0 20px 0; font-size: 16px;">📊 产量趋势</h3>
+        <div class="chart-placeholder">
+          <div class="chart-bars">
+            <div class="bar-item" v-for="(day, index) in chartData.days" :key="index">
+              <div class="bar" :style="{ height: day.value + '%' }"></div>
+              <span class="bar-label">{{ day.label }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 工序分布 -->
+      <div class="card">
+        <h3 style="margin: 0 0 20px 0; font-size: 16px;">🔧 工序产量</h3>
+        <div class="process-list">
+          <div class="process-item" v-for="p in processData" :key="p.name">
+            <div class="process-info">
+              <span class="process-name">{{ p.name }}</span>
+              <span class="process-count">{{ p.count }}件</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" :style="{ width: p.percent + '%' }"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 详细表格 -->
+    <div class="card" style="margin-top: 30px;">
+      <h3 style="margin: 0 0 20px 0; font-size: 16px;">📋 详细数据</h3>
+      <table>
         <thead>
           <tr>
-            <th>排名</th>
-            <th>姓名</th>
-            <th>班组</th>
-            <th>完成数量</th>
-            <th>平均工时</th>
+            <th>日期</th>
+            <th>订单数</th>
+            <th>产量</th>
+            <th>合格数</th>
+            <th>合格率</th>
             <th>效率</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(worker, index) in workerStats" :key="worker.id">
+          <tr v-for="d in detailData" :key="d.date">
+            <td>{{ d.date }}</td>
+            <td>{{ d.orders }}</td>
+            <td>{{ d.output }}</td>
+            <td>{{ d.qualified }}</td>
             <td>
-              <span :class="['rank', index < 3 ? 'top' : '']">{{ index + 1 }}</span>
+              <span :class="['tag', d.qualifiedRate >= 95 ? 'tag-success' : 'tag-warning']">
+                {{ d.qualifiedRate }}%
+              </span>
             </td>
-            <td>{{ worker.name }}</td>
-            <td>{{ worker.team }}</td>
-            <td>{{ worker.quantity }}</td>
-            <td>{{ worker.avgHours }}小时</td>
             <td>
-              <div class="efficiency">
-                <div class="bar" :style="{ width: worker.efficiency + '%', background: getEfficiencyColor(worker.efficiency) }"></div>
-                <span>{{ worker.efficiency }}%</span>
-              </div>
+              <span :class="['tag', d.efficiency >= 90 ? 'tag-success' : 'tag-warning']">
+                {{ d.efficiency }}%
+              </span>
             </td>
           </tr>
         </tbody>
       </table>
-    </div>
-
-    <!-- 班组对比 -->
-    <div class="section">
-      <h2>班组效率对比</h2>
-      <div class="team-chart">
-        <div class="team-row" v-for="team in teamStats" :key="team.name">
-          <div class="team-name">{{ team.name }}</div>
-          <div class="team-bar">
-            <div class="bar" :style="{ width: team.completionRate + '%' }"></div>
-          </div>
-          <div class="team-rate">{{ team.completionRate }}%</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 趋势图 -->
-    <div class="section">
-      <h2>产能趋势（近7天）</h2>
-      <div class="trend-chart">
-        <div class="chart-bar" v-for="(day, index) in trendData" :key="index">
-          <div class="bar" :style="{ height: (day.quantity / 150 * 100) + '%' }"></div>
-          <div class="label">{{ day.day }}</div>
-          <div class="value">{{ day.quantity }}</div>
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -89,67 +111,112 @@
 <script setup>
 import { ref } from 'vue'
 
-const workerStats = ref([
-  { id: 1, name: '张三', team: '焊接组', quantity: 156, avgHours: 2.8, efficiency: 105 },
-  { id: 2, name: '李四', team: '焊接组', quantity: 148, avgHours: 3.0, efficiency: 100 },
-  { id: 3, name: '王五', team: '装配组', quantity: 142, avgHours: 2.6, efficiency: 98 },
-  { id: 4, name: '赵六', team: '装配组', quantity: 135, avgHours: 2.9, efficiency: 95 },
-  { id: 5, name: '钱七', team: '油漆组', quantity: 128, avgHours: 3.1, efficiency: 92 },
-  { id: 6, name: '孙八', team: '电工组', quantity: 120, avgHours: 2.5, efficiency: 90 }
+const currentRange = ref('week')
+const updateTime = ref('12:00:00')
+
+const timeRanges = [
+  { label: '今日', value: 'today' },
+  { label: '本周', value: 'week' },
+  { label: '本月', value: 'month' },
+  { label: '本年', value: 'year' }
+]
+
+const stats = ref({
+  totalOutput: 12456,
+  qualifiedRate: 98.5,
+  efficiency: 92.3,
+  onTimeRate: 96.8
+})
+
+const chartData = ref({
+  days: [
+    { label: '周一', value: 75 },
+    { label: '周二', value: 85 },
+    { label: '周三', value: 90 },
+    { label: '周四', value: 78 },
+    { label: '周五', value: 95 },
+    { label: '周六', value: 60 },
+    { label: '周日', value: 0 }
+  ]
+})
+
+const processData = ref([
+  { name: '焊接', count: 3200, percent: 100 },
+  { name: '喷涂', count: 2800, percent: 87 },
+  { name: '折弯', count: 2400, percent: 75 },
+  { name: '切割', count: 1800, percent: 56 },
+  { name: '组装', count: 1200, percent: 37 }
 ])
 
-const teamStats = ref([
-  { name: '焊接组', completionRate: 98 },
-  { name: '装配组', completionRate: 95 },
-  { name: '油漆组', completionRate: 92 },
-  { name: '电工组', completionRate: 90 }
+const detailData = ref([
+  { date: '2026-03-03', orders: 8, output: 1560, qualified: 1542, qualifiedRate: 98.8, efficiency: 95.2 },
+  { date: '2026-03-02', orders: 10, output: 1890, qualified: 1860, qualifiedRate: 98.4, efficiency: 93.1 },
+  { date: '2026-03-01', orders: 7, output: 1420, qualified: 1390, qualifiedRate: 97.9, efficiency: 91.5 },
+  { date: '2026-02-28', orders: 9, output: 1680, qualified: 1660, qualifiedRate: 98.8, efficiency: 94.2 },
+  { date: '2026-02-27', orders: 6, output: 1250, qualified: 1230, qualifiedRate: 98.4, efficiency: 92.8 }
 ])
-
-const trendData = ref([
-  { day: '周一', quantity: 120 },
-  { day: '周二', quantity: 135 },
-  { day: '周三', quantity: 142 },
-  { day: '周四', quantity: 138 },
-  { day: '周五', quantity: 150 },
-  { day: '周六', quantity: 145 },
-  { day: '周日', quantity: 130 }
-])
-
-const getEfficiencyColor = (efficiency) => {
-  if (efficiency >= 100) return '#52c41a'
-  if (efficiency >= 90) return '#1890ff'
-  if (efficiency >= 80) return '#faad14'
-  return '#ff4d4f'
-}
 </script>
 
-<style scoped>
-.stats-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
-.card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.card .label { color: #888; font-size: 14px; margin-bottom: 8px; }
-.card .value { font-size: 28px; font-weight: bold; color: #333; }
-.card .trend { font-size: 14px; margin-top: 5px; }
-.card .trend.up { color: #52c41a; }
-.card .sub { font-size: 13px; color: #999; margin-top: 5px; }
-.section { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 20px; }
-.section h2 { font-size: 16px; margin-bottom: 15px; }
-.data-table { width: 100%; border-collapse: collapse; }
-.data-table th, .data-table td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
-.data-table th { background: #fafafa; color: #666; font-weight: 500; font-size: 13px; }
-.rank { display: inline-block; width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; background: #f0f0f0; font-size: 12px; }
-.rank.top { background: #ff4d4f; color: #fff; }
-.efficiency { display: flex; align-items: center; gap: 10px; }
-.efficiency .bar { height: 8px; border-radius: 4px; min-width: 50px; }
-.efficiency span { font-size: 13px; color: #666; }
-.team-chart { }
-.team-row { display: flex; align-items: center; margin-bottom: 15px; }
-.team-name { width: 80px; font-size: 14px; }
-.team-bar { flex: 1; height: 24px; background: #f0f0f0; border-radius: 12px; overflow: hidden; }
-.team-bar .bar { height: 100%; background: #1890ff; border-radius: 12px; }
-.team-rate { width: 50px; text-align: right; font-size: 14px; color: #666; }
-.trend-chart { display: flex; justify-content: space-between; align-items: flex-end; height: 200px; padding-top: 20px; }
-.chart-bar { display: flex; flex-direction: column; align-items: center; flex: 1; }
-.chart-bar .bar { width: 40px; background: #1890ff; border-radius: 4px 4px 0 0; min-height: 10px; }
-.chart-bar .label { margin-top: 10px; font-size: 12px; color: #999; }
-.chart-bar .value { font-size: 13px; color: #666; margin-top: 5px; }
+<style>
+.chart-placeholder {
+  height: 250px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  padding: 20px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 15px;
+  height: 100%;
+}
+
+.bar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.bar {
+  width: 40px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-light) 100%);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.5s ease;
+}
+
+.bar-label {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--foreground-light);
+}
+
+.process-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.process-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.process-info {
+  display: flex;
+  justify-content: space-between;
+}
+
+.process-name {
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.process-count {
+  color: var(--foreground-light);
+  font-size: 13px;
+}
 </style>
