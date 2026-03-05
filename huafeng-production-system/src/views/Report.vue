@@ -28,8 +28,8 @@
               <span>交货: {{ order.deliveryDate }}</span>
             </div>
             <div class="order-status">
-              <span :class="['tag', getStatusTag(order.processes[selectedProcess]?.status)]">
-                {{ order.processes[selectedProcess]?.status || '无' }}
+              <span :class="['tag', getStatusTag(getOrderProcessStatus(order, selectedProcess))]">
+                {{ getOrderProcessStatus(order, selectedProcess) || '无' }}
               </span>
             </div>
           </div>
@@ -64,20 +64,49 @@
           <div class="progress-bar"><div class="progress-fill" :style="{ width: progressPercent + '%' }"></div></div>
         </div>
 
+        <!-- 时间信息 -->
+        <div v-if="processStatus !== '待开始' && processStatus !== '无'" class="time-info-section">
+          <div class="time-item">
+            <span class="time-label">🕐 开始时间:</span>
+            <span class="time-value">{{ formatTime(getProcessTime('start')) }}</span>
+          </div>
+          <div class="time-item" v-if="processStatus === '已完成'">
+            <span class="time-label">✅ 完成时间:</span>
+            <span class="time-value">{{ formatTime(getProcessTime('end')) }}</span>
+          </div>
+          <div class="time-item" v-if="processStatus === '已完成' && getProcessDuration()">
+            <span class="time-label">⏱️ 用时:</span>
+            <span class="time-value duration">{{ getProcessDuration() }}</span>
+          </div>
+        </div>
+
         <!-- 产品清单 -->
         <div v-if="processStatus !== '待开始' && processStatus !== '无'" class="items-section">
           <table class="items-table">
-            <thead><tr><th style="width:50px">选择</th><th>件号</th><th>名称</th><th>材质</th><th>规格</th><th>数量</th><th>工艺流程</th><th>状态</th></tr></thead>
+            <thead><tr><th>件号</th><th>名称</th><th>材质</th><th>规格</th><th>需报数量</th><th>已报数量</th><th>状态</th></tr></thead>
             <tbody>
               <tr v-for="item in currentItems" :key="item.sid" :class="{ completed: isItemCompleted(item) }">
-                <td><input type="checkbox" :checked="isItemCompleted(item)" :disabled="processStatus !== '进行中'" @change="toggleItem(item)" /></td>
                 <td class="part-no">{{ item.partNo }}</td>
                 <td>{{ item.name }}</td>
                 <td>{{ item.material }}</td>
                 <td>{{ item.length }}×{{ item.width }}×{{ item.thickness }}</td>
                 <td>{{ item.quantity }}</td>
-                <td>{{ item.processRoute }}</td>
-                <td><span :class="['tag', isItemCompleted(item) ? 'tag-success' : 'tag-warning']">{{ isItemCompleted(item) ? '已完成' : '待生产' }}</span></td>
+                <td>
+                  <div class="qty-input-wrapper">
+                    <input 
+                      type="number" 
+                      :value="getReportedQty(item)" 
+                      @input="updateReportedQty(item, $event.target.value)"
+                      :min="0"
+                      :max="item.quantity"
+                      class="qty-input"
+                      :disabled="processStatus === '已完成'"
+                    />
+                    <span class="qty-sep">/</span>
+                    <span class="qty-total">{{ item.quantity }}</span>
+                  </div>
+                </td>
+                <td><span :class="['tag', isItemCompleted(item) ? 'tag-success' : 'tag-warning']">{{ isItemCompleted(item) ? '已完成' : '进行中' }}</span></td>
               </tr>
             </tbody>
           </table>
@@ -145,6 +174,31 @@ const getProcessOrders = (procName) => {
 
 const getProcessOrderCount = (procName) => getProcessOrders(procName).length
 
+// 动态计算订单中某工艺的状态（根据报工数量）
+const getOrderProcessStatus = (order, procName) => {
+  const items = order.products.filter(p => p.processRoute.includes(procName))
+  if (items.length === 0) return '无'
+  
+  // 检查是否有任何报工记录
+  const hasAnyReport = items.some(item => {
+    const reported = item.reportedQty ? item.reportedQty[procName] : 0
+    return reported > 0
+  })
+  
+  if (!hasAnyReport) {
+    // 没有报工记录，检查工艺是否已完成（从completedProcs判断）
+    return order.processes[procName]?.status || '待开始'
+  }
+  
+  // 有报工记录，判断是否全部完成
+  const allCompleted = items.every(item => {
+    const reported = item.reportedQty ? item.reportedQty[procName] : 0
+    return reported >= item.quantity
+  })
+  
+  return allCompleted ? '已完成' : '进行中'
+}
+
 const currentItems = computed(() => {
   if (!selectedOrder.value || !selectedProcess.value) return []
   return selectedOrder.value.products.filter(p => p.processRoute.includes(selectedProcess.value))
@@ -166,8 +220,173 @@ const getProcessColor = (process) => {
   return colors[process] || '#666'
 }
 
+// 获取产品已报工数量
+const getReportedQty = (item) => {
+  if (!item.reportedQty) item.reportedQty = {}
+  return item.reportedQty[selectedProcess.value] || 0
+}
+
+// 更新产品报工数量
+const updateReportedQty = (item, qty) => {
+  const num = parseInt(qty) || 0
+  if (!item.reportedQty) item.reportedQty = {}
+  item.reportedQty[selectedProcess.value] = Math.min(num, item.quantity)
+  
+  // 同步到全局数据，但不要自动设置完成状态
+  // 只有点击"完成工单"后才算真正完成
+  syncProcessStatusDuringReport()
+}
+
+// 报工过程中的同步（不自动设置完成状态）
+const syncProcessStatusDuringReport = () => {
+  if (!selectedOrder.value || !selectedProcess.value) return
+  
+  const items = currentItems.value
+  const hasAnyReport = items.some(item => {
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    return reported > 0
+  })
+  
+  if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
+  
+  // 获取之前的时间记录
+  const existingProcess = selectedOrder.value.processes[selectedProcess.value]
+  const existingStartTime = existingProcess?.startTime
+  const existingEndTime = existingProcess?.endTime
+  
+  // 报工过程中始终保持"进行中"，不自动变"已完成"
+  const completedItems = items.filter(item => {
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    return reported >= item.quantity
+  })
+  
+  selectedOrder.value.processes[selectedProcess.value] = {
+    status: '进行中',
+    completedCount: completedItems.length,
+    totalCount: items.length,
+    canSchedule: false,
+    items: items,
+    startTime: existingStartTime || null,  // 保留开始时间
+    endTime: existingEndTime || null       // 保留结束时间
+  }
+  
+  // 更新 completedProcs
+  items.forEach(item => {
+    if (!item.completedProcs) item.completedProcs = {}
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    if (reported >= item.quantity) {
+      item.completedProcs[selectedProcess.value] = '已完成'
+    } else if (reported > 0) {
+      item.completedProcs[selectedProcess.value] = '进行中'
+    }
+  })
+  
+  processStatus.value = '进行中'
+}
+
+// 同步工艺状态到订单（供排单页面读取）
+// 参数 forceCompleted 用于强制设置为已完成（点击完成工单时）
+const syncProcessStatusToOrder = (forceCompleted = false) => {
+  if (!selectedOrder.value || !selectedProcess.value) return
+  
+  const items = currentItems.value
+  const completedItems = items.filter(item => {
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    return reported >= item.quantity
+  })
+  const allCompleted = completedItems.length === items.length && items.length > 0
+  const hasAnyReport = items.some(item => {
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    return reported > 0
+  })
+  
+  // 确保 processes 对象存在
+  if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
+  
+  // 获取之前的时间记录
+  const existingProcess = selectedOrder.value.processes[selectedProcess.value]
+  const existingStartTime = existingProcess?.startTime
+  const existingEndTime = existingProcess?.endTime
+  
+  let status = '待开始'
+  if (forceCompleted || allCompleted) {
+    // 只有点击完成工单后 或者 强制设置时才为已完成
+    status = '已完成'
+  } else if (hasAnyReport) {
+    status = '进行中'
+  }
+  
+  // 更新到 order.processes - 这是排单页面读取的数据源
+  selectedOrder.value.processes[selectedProcess.value] = {
+    status: status,
+    completedCount: completedItems.length,
+    totalCount: items.length,
+    canSchedule: status !== '已完成',
+    items: items,
+    startTime: existingStartTime || null,  // 保留开始时间
+    endTime: existingEndTime || null       // 保留结束时间
+  }
+  
+  // 同时更新 completedProcs
+  items.forEach(item => {
+    if (!item.completedProcs) item.completedProcs = {}
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    // 只有全部完成才设置为已完成，否则保持进行中
+    if (forceCompleted || (reported >= item.quantity && allCompleted)) {
+      item.completedProcs[selectedProcess.value] = '已完成'
+    } else if (reported > 0) {
+      item.completedProcs[selectedProcess.value] = '进行中'
+    }
+  })
+  
+  // 更新本地状态
+  processStatus.value = status
+}
+
 const isItemCompleted = (item) => {
-  return item.completedProcs && item.completedProcs[selectedProcess.value] === '已完成'
+  const reported = getReportedQty(item)
+  return reported >= item.quantity
+}
+
+// 获取工艺的开始/结束时间
+const getProcessTime = (type) => {
+  if (!selectedOrder.value || !selectedProcess.value) return null
+  const processData = selectedOrder.value.processes?.[selectedProcess.value]
+  if (!processData) return null
+  return processData[type + 'Time'] || null
+}
+
+// 格式化时间显示
+const formatTime = (timeStr) => {
+  if (!timeStr) return '-'
+  const date = new Date(timeStr)
+  return date.toLocaleString('zh-CN', { 
+    month: '2-digit', 
+    day: '2-digit', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+
+// 计算用时
+const getProcessDuration = () => {
+  const startTime = getProcessTime('start')
+  const endTime = getProcessTime('end')
+  if (!startTime || !endTime) return null
+  
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  const diffMs = end - start
+  
+  if (diffMs < 0) return null
+  
+  const hours = Math.floor(diffMs / (1000 * 60 * 60))
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+  
+  if (hours > 0) {
+    return `${hours}小时${minutes}分钟`
+  }
+  return `${minutes}分钟`
 }
 
 const selectProcess = (procName) => {
@@ -178,29 +397,92 @@ const selectProcess = (procName) => {
 
 const selectOrder = (order) => {
   selectedOrder.value = order
-  processStatus.value = order.processes[selectedProcess.value]?.status || ''
+  
+  // 根据已报工数量动态判断并同步状态
+  const items = order.products.filter(p => p.processRoute.includes(selectedProcess.value))
+  if (items.length === 0) {
+    processStatus.value = ''
+    return
+  }
+  
+  const hasStarted = items.some(item => {
+    const reported = item.reportedQty ? item.reportedQty[selectedProcess.value] : 0
+    return reported > 0
+  })
+  
+  // 检查是否已完成（从 order.processes 读取）
+  const existingStatus = order.processes?.[selectedProcess.value]?.status
+  
+  if (existingStatus === '已完成') {
+    // 如果之前已经点击完成工单，保持已完成状态
+    processStatus.value = '已完成'
+  } else if (hasStarted) {
+    // 有报工记录但未完成工单，保持进行中状态
+    processStatus.value = '进行中'
+    // 同步进行中状态
+    syncProcessStatusDuringReport()
+  } else {
+    // 没有报工记录，保持初始状态
+    processStatus.value = '待开始'
+  }
 }
 
 const startWork = () => {
-  processStatus.value = '进行中'
+  // 初始化报工数量为0
   currentItems.value.forEach(item => {
+    if (!item.reportedQty) item.reportedQty = {}
+    if (item.reportedQty[selectedProcess.value] === undefined) {
+      item.reportedQty[selectedProcess.value] = 0
+    }
     if (!item.completedProcs) item.completedProcs = {}
     item.completedProcs[selectedProcess.value] = '进行中'
   })
-  computeProcessStatus(selectedOrder.value)
+  
+  // 设置状态为进行中
+  processStatus.value = '进行中'
+  
+  // 记录开始时间
+  if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
+  const now = new Date().toISOString()
+  selectedOrder.value.processes[selectedProcess.value] = {
+    status: '进行中',
+    completedCount: 0,
+    totalCount: currentItems.value.length,
+    canSchedule: false,
+    items: currentItems.value,
+    startTime: now,  // 记录开始时间
+    endTime: null   // 尚未完成
+  }
 }
 
+// 不再使用勾选，改为数量输入
 const toggleItem = (item) => {
-  if (!item.completedProcs) item.completedProcs = {}
-  item.completedProcs[selectedProcess.value] = item.completedProcs[selectedProcess.value] === '已完成' ? '进行中' : '已完成'
+  // 保留兼容性，但不再使用
 }
 
 const finishWork = () => {
+  // 检查是否全部报完
+  const allCompleted = currentItems.value.every(item => getReportedQty(item) >= item.quantity)
+  
+  if (!allCompleted) {
+    alert('请先完成所有产品的报工！')
+    return
+  }
+  
   processStatus.value = '已完成'
   currentItems.value.forEach(item => {
+    if (!item.completedProcs) item.completedProcs = {}
     item.completedProcs[selectedProcess.value] = '已完成'
   })
-  computeProcessStatus(selectedOrder.value)
+  
+  // 记录完成时间
+  const now = new Date().toISOString()
+  if (selectedOrder.value.processes && selectedOrder.value.processes[selectedProcess.value]) {
+    selectedOrder.value.processes[selectedProcess.value].endTime = now
+  }
+  
+  // 同步状态，forceCompleted = true 表示强制设置为已完成
+  syncProcessStatusToOrder(true)
   
   historyRecords.value.unshift({
     id: Date.now(),
@@ -237,15 +519,37 @@ const finishWork = () => {
 .empty-tip { text-align: center; padding: 30px; color: var(--foreground-light); }
 .order-detail-card { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 20px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .start-work-section { text-align: center; padding: 30px; }
-.progress-section { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 20px; }
+.progress-section { padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; }
 .progress-info { display: flex; justify-content: space-between; margin-bottom: 10px; }
 .progress-percent { font-weight: bold; color: var(--gold); }
+
+/* 时间信息样式 */
+.time-info-section { display: flex; flex-wrap: wrap; gap: 20px; padding: 12px 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; margin-bottom: 20px; color: #fff; }
+.time-item { display: flex; align-items: center; gap: 8px; }
+.time-label { font-size: 12px; opacity: 0.9; }
+.time-value { font-size: 13px; font-weight: 600; }
+.time-value.duration { background: rgba(255,255,255,0.2); padding: 2px 10px; border-radius: 12px; }
 .items-section { margin: 20px 0; overflow-x: auto; }
 .items-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .items-table th, .items-table td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
 .items-table th { background: #f8f9fa; font-weight: 600; }
 .items-table tr.completed { background: rgba(40, 167, 69, 0.1); }
 .items-table .part-no { font-family: monospace; color: var(--primary); }
+
+/* 报工数量输入框 */
+.qty-input-wrapper { display: flex; align-items: center; gap: 4px; }
+.qty-input { 
+  width: 60px; 
+  padding: 4px 8px; 
+  border: 1px solid #ddd; 
+  border-radius: 4px; 
+  font-size: 13px;
+  text-align: center;
+}
+.qty-input:focus { outline: none; border-color: var(--primary); }
+.qty-input:disabled { background: #f5f5f5; color: #999; }
+.qty-sep { color: #999; }
+.qty-total { color: #666; font-size: 12px; }
 .finish-section { text-align: center; padding: 20px; }
 .finish-tip { display: block; margin-top: 10px; font-size: 12px; color: var(--foreground-light); }
 .btn-lg { padding: 15px 40px; font-size: 16px; }

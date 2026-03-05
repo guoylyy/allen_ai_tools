@@ -211,6 +211,14 @@
           <div><strong>下游:</strong> {{ getNextProcesses(detailProcess).join(', ') || '无' }}</div>
           <div><strong>状态:</strong> {{ getStatusText(getProcessStatus(detailOrder, detailProcess)) }}</div>
           <div><strong>产品数:</strong> {{ getProcessData(detailOrder, detailProcess).totalCount }}</div>
+          <!-- 时间信息 -->
+          <div v-if="getProcessData(detailOrder, detailProcess).startTime" class="detail-time">
+            <div><strong>🕐 开始时间:</strong> {{ formatOrderTime(getProcessData(detailOrder, detailProcess).startTime) }}</div>
+            <div v-if="getProcessData(detailOrder, detailProcess).endTime"><strong>✅ 完成时间:</strong> {{ formatOrderTime(getProcessData(detailOrder, detailProcess).endTime) }}</div>
+            <div v-if="getProcessData(detailOrder, detailProcess).startTime && getProcessData(detailOrder, detailProcess).endTime" class="detail-duration">
+              <strong>⏱️ 用时:</strong> {{ calculateDuration(getProcessData(detailOrder, detailProcess).startTime, getProcessData(detailOrder, detailProcess).endTime) }}
+            </div>
+          </div>
         </div>
         <table style="width: 100%; font-size: 12px; margin-top: 15px;">
           <thead><tr><th>件号</th><th>名称</th><th>材质</th><th>规格</th><th>数量</th><th>工艺流程</th><th>状态</th></tr></thead>
@@ -427,11 +435,27 @@ const scheduleProcess = (order, procName) => {
 const confirmSchedule = () => {
   if (schedulingOrder.value && schedulingProcess.value) {
     const items = getProcessData(schedulingOrder.value, schedulingProcess.value).items
+    
+    // 更新每个产品的状态
     items.forEach(item => {
       if (!item.completedProcs) item.completedProcs = {}
       item.completedProcs[schedulingProcess.value] = '进行中'
     })
-    computeProcessStatus(schedulingOrder.value)
+    
+    // 直接设置工艺状态为进行中，而不是依赖 computeProcessStatus
+    if (!schedulingOrder.value.processes) schedulingOrder.value.processes = {}
+    
+    // 获取现有的时间记录
+    const existingProcess = schedulingOrder.value.processes[schedulingProcess.value]
+    const startTime = existingProcess?.startTime || new Date().toISOString()
+    
+    schedulingOrder.value.processes[schedulingProcess.value] = {
+      ...existingProcess,
+      status: '进行中',
+      canSchedule: false,
+      startTime: startTime  // 保留或设置开始时间
+    }
+    
     alert('排单成功！')
     showScheduleModal.value = false
   }
@@ -443,12 +467,42 @@ const viewProcessDetail = (order, procName) => {
   showDetailModal.value = true
 }
 
+// 格式化时间显示
+const formatOrderTime = (timeStr) => {
+  if (!timeStr) return '-'
+  const date = new Date(timeStr)
+  return date.toLocaleString('zh-CN', { 
+    month: '2-digit', 
+    day: '2-digit', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  })
+}
+
+// 计算用时
+const calculateDuration = (startTime, endTime) => {
+  if (!startTime || !endTime) return null
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  const diffMs = end - start
+  if (diffMs < 0) return null
+  const hours = Math.floor(diffMs / (1000 * 60 * 60))
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+  if (hours > 0) {
+    return `${hours}小时${minutes}分钟`
+  }
+  return `${minutes}分钟`
+}
+
 const getProcessOrders = (procName) => ordersData.value.filter(o => getProcessData(o, procName).totalCount > 0)
 const getProcessOrderCount = (procName) => getProcessOrders(procName).length
 
 onMounted(() => {
   ordersData.value.forEach(order => { 
-    computeProcessStatus(order)
+    // 只有在没有 processes 数据时才计算，避免覆盖手动设置的状态
+    if (!order.processes || Object.keys(order.processes).length === 0) {
+      computeProcessStatus(order)
+    }
     // 初始化折叠状态 - 默认收起
     expandedOrderCards.value[order.id] = true // 默认展开头部
     expandedSections.value[order.id] = { flow: false, products: false } // 默认收起详情
@@ -653,7 +707,9 @@ onMounted(() => {
 .order-mini-header { display: flex; justify-content: space-between; align-items: center; }
 .order-id-mini { font-weight: 600; color: var(--primary); font-size: 13px; }
 
-.detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+.detail-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px; }
+.detail-time { grid-column: 1 / -1; padding-top: 10px; border-top: 1px solid #ddd; margin-top: 5px; }
+.detail-duration { margin-top: 8px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 8px 12px; border-radius: 8px; display: inline-block; }
 .row-completed { background: rgba(40, 167, 69, 0.1); }
 .tag-danger { background: #dc3545; color: #fff; }
 </style>
