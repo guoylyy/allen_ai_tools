@@ -237,6 +237,15 @@ const updateReportedQty = (item, qty) => {
   syncProcessStatusDuringReport()
 }
 
+// 记录每个订单工艺的开始/结束时间
+const processTimes = ref({}) // { "orderId-processName": { startTime, endTime } }
+
+// 获取时间key
+const getTimeKey = () => {
+  if (!selectedOrder.value || !selectedProcess.value) return null
+  return `${selectedOrder.value.id}-${selectedProcess.value}`
+}
+
 // 报工过程中的同步（不自动设置完成状态）
 const syncProcessStatusDuringReport = () => {
   if (!selectedOrder.value || !selectedProcess.value) return
@@ -249,10 +258,9 @@ const syncProcessStatusDuringReport = () => {
   
   if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
   
-  // 获取之前的时间记录
-  const existingProcess = selectedOrder.value.processes[selectedProcess.value]
-  const existingStartTime = existingProcess?.startTime
-  const existingEndTime = existingProcess?.endTime
+  // 从全局变量获取时间
+  const timeKey = getTimeKey()
+  const savedTimes = timeKey ? processTimes.value[timeKey] : null
   
   // 报工过程中始终保持"进行中"，不自动变"已完成"
   const completedItems = items.filter(item => {
@@ -266,8 +274,8 @@ const syncProcessStatusDuringReport = () => {
     totalCount: items.length,
     canSchedule: false,
     items: items,
-    startTime: existingStartTime || null,  // 保留开始时间
-    endTime: existingEndTime || null       // 保留结束时间
+    startTime: savedTimes?.startTime || null,
+    endTime: savedTimes?.endTime || null
   }
   
   // 更新 completedProcs
@@ -303,15 +311,17 @@ const syncProcessStatusToOrder = (forceCompleted = false) => {
   // 确保 processes 对象存在
   if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
   
-  // 获取之前的时间记录
-  const existingProcess = selectedOrder.value.processes[selectedProcess.value]
-  const existingStartTime = existingProcess?.startTime
-  const existingEndTime = existingProcess?.endTime
+  // 从全局变量获取时间
+  const timeKey = getTimeKey()
+  const savedTimes = timeKey ? processTimes.value[timeKey] : null
   
   let status = '待开始'
   if (forceCompleted || allCompleted) {
     // 只有点击完成工单后 或者 强制设置时才为已完成
     status = '已完成'
+    // 记录完成时间
+    if (timeKey && !processTimes.value[timeKey]) processTimes.value[timeKey] = {}
+    if (timeKey) processTimes.value[timeKey].endTime = new Date().toISOString()
   } else if (hasAnyReport) {
     status = '进行中'
   }
@@ -323,8 +333,8 @@ const syncProcessStatusToOrder = (forceCompleted = false) => {
     totalCount: items.length,
     canSchedule: status !== '已完成',
     items: items,
-    startTime: existingStartTime || null,  // 保留开始时间
-    endTime: existingEndTime || null       // 保留结束时间
+    startTime: savedTimes?.startTime || null,
+    endTime: savedTimes?.endTime || null
   }
   
   // 同时更新 completedProcs
@@ -441,7 +451,14 @@ const startWork = () => {
   // 设置状态为进行中
   processStatus.value = '进行中'
   
-  // 记录开始时间
+  // 记录开始时间到全局变量
+  const timeKey = getTimeKey()
+  if (timeKey) {
+    if (!processTimes.value[timeKey]) processTimes.value[timeKey] = {}
+    processTimes.value[timeKey].startTime = new Date().toISOString()
+  }
+  
+  // 同步状态
   if (!selectedOrder.value.processes) selectedOrder.value.processes = {}
   const now = new Date().toISOString()
   selectedOrder.value.processes[selectedProcess.value] = {
@@ -450,8 +467,8 @@ const startWork = () => {
     totalCount: currentItems.value.length,
     canSchedule: false,
     items: currentItems.value,
-    startTime: now,  // 记录开始时间
-    endTime: null   // 尚未完成
+    startTime: now,
+    endTime: null
   }
 }
 
@@ -475,14 +492,20 @@ const finishWork = () => {
     item.completedProcs[selectedProcess.value] = '已完成'
   })
   
-  // 记录完成时间
-  const now = new Date().toISOString()
-  if (selectedOrder.value.processes && selectedOrder.value.processes[selectedProcess.value]) {
-    selectedOrder.value.processes[selectedProcess.value].endTime = now
-  }
-  
   // 同步状态，forceCompleted = true 表示强制设置为已完成
+  // 结束时间会在 syncProcessStatusToOrder 中统一记录
   syncProcessStatusToOrder(true)
+  
+  // 重新计算 canSchedule，让下游工序可以排单
+  computeProcessStatus(selectedOrder.value)
+  
+  // computeProcessStatus 会覆盖时间，需要重新设置
+  const timeKey = getTimeKey()
+  const savedTimes = timeKey ? processTimes.value[timeKey] : null
+  if (savedTimes && selectedOrder.value.processes && selectedOrder.value.processes[selectedProcess.value]) {
+    selectedOrder.value.processes[selectedProcess.value].startTime = savedTimes.startTime
+    selectedOrder.value.processes[selectedProcess.value].endTime = savedTimes.endTime
+  }
   
   historyRecords.value.unshift({
     id: Date.now(),
