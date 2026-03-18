@@ -497,6 +497,10 @@ function parseTime(text) {
     let hour = null;
     let minute = 0;
     
+    // 记录原始输入，方便调试
+    console.log(`[时间解析] 解析文本: "${text}"`);
+    
+    // 优先处理更具体的时间格式（带上下午的）
     // 处理 "下午X点" 或 "晚上X点" (支持中文数字分钟)
     const afternoonMatch = text.match(/(?:下午|晚上)(\d{1,2})点(?:([一二三四五六七八九十半刻]+)分?)?/);
     if (afternoonMatch) {
@@ -520,7 +524,7 @@ function parseTime(text) {
         return { hour, minute };
     }
     
-    // 处理纯数字时间 "X点Y分" 或 "X点Y"
+    // 处理纯数字时间 "X点Y分" 或 "X点Y" (放在 hourOnlyMatch 之前，避免被截断)
     const timeMatch = text.match(/(\d{1,2})点(\d+)/);
     if (timeMatch) {
         hour = parseInt(timeMatch[1]);
@@ -538,7 +542,7 @@ function parseTime(text) {
         return { hour, minute };
     }
     
-    // 处理只有小时没有分钟的情况 "X点"
+    // 处理只有小时没有分钟的情况 "X点" (放在最后，避免截断更具体的时间格式)
     const hourOnlyMatch = text.match(/(\d{1,2})点/);
     if (hourOnlyMatch) {
         hour = parseInt(hourOnlyMatch[1]);
@@ -546,6 +550,7 @@ function parseTime(text) {
         return { hour, minute: 0 };
     }
     
+    console.log(`[时间解析] 未匹配到时间`);
     return null;
 }
 
