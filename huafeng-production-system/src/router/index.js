@@ -5,6 +5,7 @@ import Workers from '../views/Workers.vue'
 import Report from '../views/Report.vue'
 import Stats from '../views/Stats.vue'
 import BossBoard from '../views/BossBoard.vue'
+import ClientPortal from '../views/ClientPortal.vue'
 
 const routes = [
   { path: '/', name: 'Dashboard', component: Dashboard, meta: { title: '进度看板' } },
@@ -12,7 +13,8 @@ const routes = [
   { path: '/workers', name: 'Workers', component: Workers, meta: { title: '员工管理' } },
   { path: '/report', name: 'Report', component: Report, meta: { title: '扫码报工' } },
   { path: '/stats', name: 'Stats', component: Stats, meta: { title: '效率统计' } },
-  { path: '/boss', name: 'BossBoard', component: BossBoard, meta: { title: '老板看板' } }
+  { path: '/boss', name: 'BossBoard', component: BossBoard, meta: { title: '老板看板' } },
+  { path: '/client', name: 'ClientPortal', component: ClientPortal, meta: { title: '客户进度查询' } }
 ]
 
 export default createRouter({

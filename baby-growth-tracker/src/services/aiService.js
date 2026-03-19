@@ -289,8 +289,9 @@ function getLocalISOString(date) {
 function validateAndCompleteResult(parsed, originalText) {
     const now = new Date();
     const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentDate = now.getDate();
+
+    console.log(`[验证结果] 原始输入: "${originalText}"`);
+    console.log(`[验证结果] AI 返回:`, JSON.stringify(parsed));
 
     // 验证类型
     const validTypes = Object.keys(RECORD_TYPES);
@@ -320,79 +321,51 @@ function validateAndCompleteResult(parsed, originalText) {
         parsed.message = parsed.message + valueInfo;
     }
 
-    // 优先使用 AI 返回的 recorded_at（如果存在且有效且合理）
-    if (parsed.recorded_at && typeof parsed.recorded_at === 'string') {
+    // 首先执行本地时间解析（作为参考）
+    const dateInfo = parseRelativeDate(originalText);
+    const localTimeInfo = parseTime(dateInfo.remainingText);
+    
+    console.log(`[验证结果] 本地解析时间:`, localTimeInfo);
+    console.log(`[验证结果] 相对日期:`, dateInfo);
+
+    // 优先使用本地解析的时间（更可靠）
+    // 只有在没有识别到具体时间时才使用 AI 返回的时间
+    if (!localTimeInfo && parsed.recorded_at && typeof parsed.recorded_at === 'string') {
+        console.log(`[验证结果] 本地未识别到时间，尝试使用 AI 返回的时间`);
         try {
-            // 尝试解析 AI 返回的时间
             const aiDate = new Date(parsed.recorded_at);
             if (!isNaN(aiDate.getTime())) {
-                // 验证 AI 返回的时间是否合理：
-                // 1. 必须是当前年份
-                // 2. 月份和日期必须在合理范围内
                 const aiYear = aiDate.getFullYear();
-                const aiMonth = aiDate.getMonth();
-                const aiDay = aiDate.getDate();
-                
-                // 检查是否是当前年份
                 if (aiYear === currentYear) {
-                    // 检查月份是否有效（0-11）
-                    if (aiMonth >= 0 && aiMonth <= 11) {
-                        // 检查日期是否有效（1-31）
-                        if (aiDay >= 1 && aiDay <= 31) {
-                            // 额外检查：确保日期不超过当月最大天数
-                            const maxDay = new Date(currentYear, aiMonth + 1, 0).getDate();
-                            if (aiDay <= maxDay) {
-                                // AI 返回的时间合理，使用它
-                                // 不需要再设置年份，因为已经是当前年份
-                                parsed.recorded_at = getLocalISOString(aiDate);
-                                console.log(`[验证结果] 使用 AI 返回的时间: ${parsed.recorded_at}`);
-                                
-                                // 解析时长
-                                const duration = parseDuration(originalText);
-                                if (duration && !parsed.duration) {
-                                    parsed.duration = duration;
-                                }
-
-                                // 确保有原始内容
-                                if (!parsed.content) {
-                                    parsed.content = originalText;
-                                }
-
-                                return parsed;
-                            }
-                        }
+                    parsed.recorded_at = getLocalISOString(aiDate);
+                    console.log(`[验证结果] 使用 AI 返回的时间: ${parsed.recorded_at}`);
+                    
+                    if (!parsed.content) {
+                        parsed.content = originalText;
                     }
+                    return parsed;
                 }
-                
-                // 如果 AI 返回的时间不合理，记录警告并使用本地解析
-                console.log(`[验证结果] AI 返回的时间不合理 (${aiYear}-${aiMonth + 1}-${aiDay})，将使用本地解析`);
             }
         } catch (e) {
-            console.log(`[验证结果] AI 返回的时间解析失败: ${parsed.recorded_at}`);
+            console.log(`[验证结果] AI 返回的时间解析失败`);
         }
     }
 
-    // AI 没有返回有效的时间，执行本地解析作为后备
-    console.log(`[验证结果] 执行本地时间解析`);
-    
-    // 解析相对日期和具体日期
-    const dateInfo = parseRelativeDate(originalText);
-    const timeInfo = parseTime(dateInfo.remainingText);
+    // 使用本地解析的时间
+    console.log(`[验证结果] 使用本地解析的时间`);
     
     // 创建目标日期：默认使用今天
     let targetDate = new Date();
     
     // 只有当用户明确提到相对日期或具体日期时才改变日期
-    // 否则默认使用今天
     const hasRelativeDate = originalText.includes('昨天') || originalText.includes('昨日') || 
                            originalText.includes('前天') || originalText.includes('今天');
     const hasSpecificDate = dateInfo && dateInfo.date && (
-        originalText.match(/\d{1,2}\s*月\s*\d{1,2}/) ||  // "3月12日"
-        originalText.match(/^\d{1,2}\s*日$/)              // "12日"
+        originalText.match(/\d{1,2}\s*月\s*\d{1,2}/) ||
+        originalText.match(/^\d{1,2}\s*日$/)
     );
     
     if (hasRelativeDate) {
-        // 如果用户提到了相对日期，使用解析出的日期
         if (originalText.includes('昨天') || originalText.includes('昨日')) {
             targetDate.setDate(now.getDate() - 1);
         } else if (originalText.includes('前天')) {
@@ -401,26 +374,24 @@ function validateAndCompleteResult(parsed, originalText) {
             targetDate.setDate(now.getDate());
         }
     } else if (hasSpecificDate) {
-        // 只有当用户明确提到具体日期（如"3月12日"）时才使用
         const parsedMonth = dateInfo.date.getMonth();
         const parsedDay = dateInfo.date.getDate();
         targetDate = new Date(currentYear, parsedMonth, parsedDay);
     }
-    // else: 默认使用今天，不需要额外处理
     
-    // 设置时间 - 如果没有识别到具体时间，使用当前时间
-    if (timeInfo) {
-        targetDate.setHours(timeInfo.hour, timeInfo.minute, 0, 0);
-    } else {
-        // 如果没有具体时间，使用当前时间
-        targetDate = new Date();
+    // 设置时间 - 关键：使用本地解析出的时间！
+    if (localTimeInfo) {
+        targetDate.setHours(localTimeInfo.hour, localTimeInfo.minute, 0, 0);
+        console.log(`[验证结果] 设置具体时间: ${localTimeInfo.hour}:${localTimeInfo.minute}`);
     }
+    // 如果没有识别到具体时间，保持当前时间不变（不在这里设置为 new Date()）
     
     // 强制使用当前年份
     targetDate.setFullYear(currentYear);
     
-    // 使用本地时间格式（解决时区问题）
+    // 使用本地时间格式
     parsed.recorded_at = getLocalISOString(targetDate);
+    console.log(`[验证结果] 最终 recorded_at: ${parsed.recorded_at}`);
     
     // 解析时长
     const duration = parseDuration(originalText);
