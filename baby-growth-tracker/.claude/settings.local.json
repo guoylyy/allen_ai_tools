@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(lsof:*)",
-      "Bash(node -e:*)"
+      "Bash(node -e:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
