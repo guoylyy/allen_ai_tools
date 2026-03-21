@@ -1,6 +1,6 @@
 {
   "name": "baby-growth-tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "小孩成长记录微信服务号",
   "main": "src/index.js",
   "scripts": {
