@@ -1,10 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
+import { useUserStore } from '@/stores/user'
 import ExifReader from 'exifreader'
 
 const router = useRouter()
+const userStore = useUserStore()
 const photos = ref([])
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
@@ -15,6 +17,36 @@ const LIMIT = 30
 // 图片预览弹窗
 const showPreview = ref(false)
 const previewUrl = ref('')
+
+// 获取宝宝出生日期
+const babyBirthday = computed(() => {
+  if (userStore.currentChild?.birthday) {
+    return new Date(userStore.currentChild.birthday)
+  }
+  return null
+})
+
+// 计算照片拍摄时是出生第几天
+function getDaysSinceBirth(takenAt) {
+  if (!babyBirthday.value || !takenAt) return null
+
+  const birthDate = babyBirthday.value
+  const photoDate = new Date(takenAt)
+
+  // 计算天数差
+  const diffTime = photoDate.getTime() - birthDate.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+  // 如果是出生当天，返回"第1天"
+  if (diffDays === 0) {
+    return '第1天'
+  }
+  // 如果是出生前，返回null不显示
+  if (diffDays < 0) {
+    return null
+  }
+  return `第${diffDays + 1}天`
+}
 
 // 加载相册照片（首次加载）
 async function loadPhotos() {
@@ -253,7 +285,11 @@ function formatDate(date) {
   })
 }
 
-onMounted(() => {
+onMounted(async () => {
+  // 确保有宝宝信息
+  if (!userStore.currentChild) {
+    await userStore.fetchChildren()
+  }
   loadPhotos()
   window.addEventListener('scroll', handleScroll)
 })
@@ -312,14 +348,21 @@ onUnmounted(() => {
         <div
           v-for="photo in photos"
           :key="photo.id"
-          class="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer"
+          class="aspect-square rounded-lg overflow-hidden bg-gray-100 cursor-pointer relative"
           @click="openPreview(photo.url)"
         >
-          <img 
-            :src="photo.url" 
+          <img
+            :src="photo.url"
             class="w-full h-full object-cover"
             alt="宝宝照片"
           />
+          <!-- 出生天数标签 -->
+          <div
+            v-if="getDaysSinceBirth(photo.taken_at || photo.created_at)"
+            class="absolute bottom-1 left-1 right-1 text-center text-xs text-white bg-black/50 rounded px-1 py-0.5 truncate"
+          >
+            {{ getDaysSinceBirth(photo.taken_at || photo.created_at) }}
+          </div>
         </div>
       </div>
       
