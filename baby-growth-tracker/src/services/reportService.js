@@ -18,7 +18,7 @@ class ReportService {
     static async sendDailyReports() {
         try {
             // 获取所有用户
-            const [users] = await db.connection.query('SELECT DISTINCT openid FROM records');
+            const [users] = await db.pool.query('SELECT DISTINCT openid FROM records');
             
             const today = new Date().toISOString().split('T')[0];
             

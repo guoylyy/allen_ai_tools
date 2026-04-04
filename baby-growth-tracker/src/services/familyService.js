@@ -15,7 +15,7 @@ class FamilyService {
 
   // 辅助方法：执行查询
   async query(sql, params = []) {
-    return await this.db.connection.query(sql, params);
+    return await this.db.pool.query(sql, params);
   }
 
   // 创建或获取家庭

@@ -103,7 +103,7 @@ app.post('/api/auth/login', async (req, res) => {
         let user;
         // 如果提供了手机号，根据手机号查询用户
         if (phone) {
-            const [users] = await db.connection.query(
+            const [users] = await db.pool.query(
                 'SELECT * FROM users WHERE phone = ?',
                 [phone]
             );
@@ -111,7 +111,7 @@ app.post('/api/auth/login', async (req, res) => {
                 user = users[0];
             } else {
                 // 创建新用户
-                const [result] = await db.connection.query(
+                const [result] = await db.pool.query(
                     'INSERT INTO users (openid, phone) VALUES (?, ?)',
                     ['phone_' + phone, phone]
                 );

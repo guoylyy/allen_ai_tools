@@ -6,31 +6,45 @@ dotenv.config();
 
 class Database {
     constructor() {
-        this.connection = null;
+        this.pool = null;
     }
 
-    // 初始化数据库连接
+    // 初始化数据库连接池
     async initialize() {
         try {
-            this.connection = await mysql.createConnection({
+            this.pool = mysql.createPool({
                 host: process.env.DB_HOST || 'localhost',
                 user: process.env.DB_USER || 'root',
                 password: process.env.DB_PASSWORD || '',
                 database: process.env.DB_NAME || 'baby_growth',
                 port: process.env.DB_PORT || 3306,
-                dateStrings: true // 返回字符串格式的日期，不转换为 Date 对象
+                dateStrings: true, // 返回字符串格式的日期，不转换为 Date 对象
+                // 连接池配置
+                waitForConnections: true,
+                connectionLimit: 10,
+                queueLimit: 0,
+                enableKeepAlive: true,
+                keepAliveInitialDelay: 0
             });
 
+            // 测试连接
+            const connection = await this.pool.getConnection();
             console.log('数据库连接成功');
+            connection.release();
             
             // 创建表
             await this.createTables();
             
             // 执行数据库迁移（添加新字段）
-            await migrateDatabase(this.connection);
+            await migrateDatabase(this.pool);
         } catch (error) {
             console.error('数据库连接失败:', error.message);
         }
+    }
+
+    // 获取连接（用于需要事务的操作）
+    async getConnection() {
+        return await this.pool.getConnection();
     }
 
     // 创建数据表
@@ -124,18 +138,18 @@ class Database {
             )
         `;
 
-        await this.connection.query(createUsersTable);
-        await this.connection.query(createChildrenTable);
-        await this.connection.query(createRecordsTable);
-        await this.connection.query(createFamilyMembersTable);
-        await this.connection.query(createAlbumPhotosTable);
+        await this.pool.query(createUsersTable);
+        await this.pool.query(createChildrenTable);
+        await this.pool.query(createRecordsTable);
+        await this.pool.query(createFamilyMembersTable);
+        await this.pool.query(createAlbumPhotosTable);
 
         console.log('数据表创建成功');
 
         // 插入默认孩子数据（如果不存在）
-        const [children] = await this.connection.query('SELECT * FROM children WHERE name = ?', ['郭路谦']);
+        const [children] = await this.pool.query('SELECT * FROM children WHERE name = ?', ['郭路谦']);
         if (children.length === 0) {
-            await this.connection.query(
+            await this.pool.query(
                 'INSERT INTO children (name, birthday, gender) VALUES (?, ?, ?)',
                 ['郭路谦', '2026-01-01', 'male']
             );
@@ -155,11 +169,11 @@ class Database {
         const { openid, child_id, type, content, duration, value, emotion, recorded_at } = record;
         
         // 获取或创建用户
-        const [users] = await this.connection.query('SELECT id FROM users WHERE openid = ?', [openid]);
+        const [users] = await this.pool.query('SELECT id FROM users WHERE openid = ?', [openid]);
         let userId;
         
         if (users.length === 0) {
-            const [result] = await this.connection.query('INSERT INTO users (openid) VALUES (?)', [openid]);
+            const [result] = await this.pool.query('INSERT INTO users (openid) VALUES (?)', [openid]);
             userId = result.insertId;
         } else {
             userId = users[0].id;
@@ -171,7 +185,7 @@ class Database {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
-        const [result] = await this.connection.query(sql, [
+        const [result] = await this.pool.query(sql, [
             child_id || 1,
             userId,
             openid,
@@ -195,7 +209,7 @@ class Database {
             ORDER BY recorded_at DESC
         `;
         
-        const [records] = await this.connection.query(sql, [childId, date]);
+        const [records] = await this.pool.query(sql, [childId, date]);
         return records;
     }
 
@@ -233,9 +247,9 @@ class Database {
             params = [openid];
         }
         
-        const [records] = await this.connection.query(sql, params);
+        const [records] = await this.pool.query(sql, params);
         
-        const [countResult] = await this.connection.query(countSql, params);
+        const [countResult] = await this.pool.query(countSql, params);
         
         return {
             records,
@@ -254,14 +268,14 @@ class Database {
             ORDER BY recorded_at DESC
         `;
         
-        const [records] = await this.connection.query(sql, [childId, startDate, endDate]);
+        const [records] = await this.pool.query(sql, [childId, startDate, endDate]);
         return records;
     }
 
     // 根据 ID 获取单条记录
     async getRecordById(id) {
         const sql = 'SELECT * FROM records WHERE id = ?';
-        const [records] = await this.connection.query(sql, [id]);
+        const [records] = await this.pool.query(sql, [id]);
         return records[0] || null;
     }
 
@@ -274,21 +288,21 @@ class Database {
             WHERE id = ?
         `;
         
-        const [result] = await this.connection.query(sql, [content, duration, value, emotion, recorded_at, id]);
+        const [result] = await this.pool.query(sql, [content, duration, value, emotion, recorded_at, id]);
         return result.affectedRows;
     }
 
     // 删除记录
     async deleteRecord(id) {
         const sql = 'DELETE FROM records WHERE id = ?';
-        const [result] = await this.connection.query(sql, [id]);
+        const [result] = await this.pool.query(sql, [id]);
         return result.affectedRows;
     }
 
     // 获取所有孩子
     async getChildren(openid) {
         // 先获取用户所在的家庭ID
-        const [users] = await this.connection.query(
+        const [users] = await this.pool.query(
             'SELECT family_id FROM users WHERE openid = ?',
             [openid]
         );
@@ -296,7 +310,7 @@ class Database {
         let children;
         if (users.length > 0 && users[0].family_id) {
             // 根据家庭ID获取孩子
-            [children] = await this.connection.query(
+            [children] = await this.pool.query(
                 'SELECT * FROM children WHERE family_id = ?',
                 [users[0].family_id]
             );
@@ -304,7 +318,7 @@ class Database {
         
         // 如果没有关联数据，返回所有孩子
         if (!children || children.length === 0) {
-            const [allChildren] = await this.connection.query('SELECT * FROM children');
+            const [allChildren] = await this.pool.query('SELECT * FROM children');
             return allChildren;
         }
         return children;
@@ -314,7 +328,7 @@ class Database {
     async addChild(data) {
         const { name, birthday, gender, avatar } = data;
         const sql = 'INSERT INTO children (name, birthday, gender, avatar) VALUES (?, ?, ?, ?)';
-        const [result] = await this.connection.query(sql, [name, birthday, gender, avatar]);
+        const [result] = await this.pool.query(sql, [name, birthday, gender, avatar]);
         return result.insertId;
     }
 
@@ -322,17 +336,17 @@ class Database {
     async updateChild(id, data) {
         const { name, birthday, gender, avatar } = data;
         const sql = 'UPDATE children SET name = ?, birthday = ?, gender = ?, avatar = ? WHERE id = ?';
-        const [result] = await this.connection.query(sql, [name, birthday, gender, avatar, id]);
+        const [result] = await this.pool.query(sql, [name, birthday, gender, avatar, id]);
         return result.affectedRows;
     }
 
     // 删除孩子
     async deleteChild(id) {
         // 先删除孩子的相关记录
-        await this.connection.query('DELETE FROM records WHERE child_id = ?', [id]);
-        await this.connection.query('DELETE FROM album_photos WHERE child_id = ?', [id]);
+        await this.pool.query('DELETE FROM records WHERE child_id = ?', [id]);
+        await this.pool.query('DELETE FROM album_photos WHERE child_id = ?', [id]);
         // 删除孩子
-        const [result] = await this.connection.query('DELETE FROM children WHERE id = ?', [id]);
+        const [result] = await this.pool.query('DELETE FROM children WHERE id = ?', [id]);
         return result.affectedRows;
     }
 
@@ -344,7 +358,7 @@ class Database {
             LEFT JOIN users u ON fm.user_id = u.id
             WHERE fm.child_id = ?
         `;
-        const [members] = await this.connection.query(sql, [childId]);
+        const [members] = await this.pool.query(sql, [childId]);
         return members;
     }
 
@@ -355,9 +369,9 @@ class Database {
         // 如果只提供了 openid，先获取或创建用户
         let userId = user_id;
         if (openid && !userId) {
-            const [users] = await this.connection.query('SELECT id FROM users WHERE openid = ?', [openid]);
+            const [users] = await this.pool.query('SELECT id FROM users WHERE openid = ?', [openid]);
             if (users.length === 0) {
-                const [result] = await this.connection.query('INSERT INTO users (openid) VALUES (?)', [openid]);
+                const [result] = await this.pool.query('INSERT INTO users (openid) VALUES (?)', [openid]);
                 userId = result.insertId;
             } else {
                 userId = users[0].id;
@@ -365,7 +379,7 @@ class Database {
         }
         
         const sql = 'INSERT INTO family_members (child_id, user_id, role) VALUES (?, ?, ?)';
-        const [result] = await this.connection.query(sql, [child_id, userId, role]);
+        const [result] = await this.pool.query(sql, [child_id, userId, role]);
         return result.insertId;
     }
 
@@ -373,14 +387,14 @@ class Database {
     async updateFamilyMember(id, data) {
         const { role } = data;
         const sql = 'UPDATE family_members SET role = ? WHERE id = ?';
-        const [result] = await this.connection.query(sql, [role, id]);
+        const [result] = await this.pool.query(sql, [role, id]);
         return result.affectedRows;
     }
 
     // 删除家庭成员
     async deleteFamilyMember(id) {
         const sql = 'DELETE FROM family_members WHERE id = ?';
-        const [result] = await this.connection.query(sql, [id]);
+        const [result] = await this.pool.query(sql, [id]);
         return result.affectedRows;
     }
 
@@ -398,7 +412,7 @@ class Database {
             WHERE child_id = ? AND DATE(CONVERT_TZ(recorded_at, '+00:00', '+08:00')) = ?
             GROUP BY type
         `;
-        const [stats] = await this.connection.query(sql, [childId, targetDate]);
+        const [stats] = await this.pool.query(sql, [childId, targetDate]);
         
         console.log('[DB] getTodayOverview stats:', stats);
         
@@ -435,7 +449,7 @@ class Database {
             GROUP BY DATE(recorded_at)
             ORDER BY date
         `;
-        const [data] = await this.connection.query(sql, [childId, type, startDate, endDate]);
+        const [data] = await this.pool.query(sql, [childId, type, startDate, endDate]);
         return data;
     }
 
@@ -452,7 +466,7 @@ class Database {
             AND DATE(CONVERT_TZ(recorded_at, '+00:00', '+08:00')) BETWEEN ? AND ?
             GROUP BY type
         `;
-        const [stats] = await this.connection.query(sql, [childId, weekStartDate, weekEndDate.toISOString().split('T')[0]]);
+        const [stats] = await this.pool.query(sql, [childId, weekStartDate, weekEndDate.toISOString().split('T')[0]]);
         
         // 获取每日详情（包含睡眠时长）
         const dailySql = `
@@ -463,7 +477,7 @@ class Database {
             GROUP BY DATE(CONVERT_TZ(recorded_at, '+00:00', '+08:00')), type
             ORDER BY date, type
         `;
-        const [daily] = await this.connection.query(dailySql, [childId, weekStartDate, weekEndDate.toISOString().split('T')[0]]);
+        const [daily] = await this.pool.query(dailySql, [childId, weekStartDate, weekEndDate.toISOString().split('T')[0]]);
         
         return { summary: stats, daily };
     }
@@ -478,7 +492,7 @@ class Database {
             AND DATE(CONVERT_TZ(recorded_at, '+00:00', '+08:00')) BETWEEN ? AND ?
             GROUP BY type
         `;
-        const [stats] = await this.connection.query(sql, [childId, startDate, endDate]);
+        const [stats] = await this.pool.query(sql, [childId, startDate, endDate]);
         
         // 获取每日详情（包含睡眠时长）
         const dailySql = `
@@ -489,17 +503,17 @@ class Database {
             GROUP BY DATE(CONVERT_TZ(recorded_at, '+00:00', '+08:00')), type
             ORDER BY date, type
         `;
-        const [daily] = await this.connection.query(dailySql, [childId, startDate, endDate]);
+        const [daily] = await this.pool.query(dailySql, [childId, startDate, endDate]);
         
         return { summary: stats, daily };
     }
 
     // 获取用户信息
     async getUserInfo(openid) {
-        const [users] = await this.connection.query('SELECT * FROM users WHERE openid = ?', [openid]);
+        const [users] = await this.pool.query('SELECT * FROM users WHERE openid = ?', [openid]);
         if (users.length === 0) {
             // 创建新用户
-            const [result] = await this.connection.query('INSERT INTO users (openid) VALUES (?)', [openid]);
+            const [result] = await this.pool.query('INSERT INTO users (openid) VALUES (?)', [openid]);
             return { id: result.insertId, openid };
         }
         return users[0];
@@ -509,20 +523,20 @@ class Database {
     async updateUserInfo(openid, data) {
         const { nickname, avatar } = data;
         const sql = 'UPDATE users SET nickname = ?, avatar = ? WHERE openid = ?';
-        const [result] = await this.connection.query(sql, [nickname, avatar, openid]);
+        const [result] = await this.pool.query(sql, [nickname, avatar, openid]);
         return result.affectedRows;
     }
 
     // 获取用户当前抚养的孩子
     async getCurrentChild(openid) {
-        const [users] = await this.connection.query(
+        const [users] = await this.pool.query(
             'SELECT current_child_id FROM users WHERE openid = ?',
             [openid]
         );
         if (users.length === 0 || !users[0].current_child_id) {
             return null;
         }
-        const [children] = await this.connection.query(
+        const [children] = await this.pool.query(
             'SELECT * FROM children WHERE id = ?',
             [users[0].current_child_id]
         );
@@ -532,7 +546,7 @@ class Database {
     // 设置用户当前抚养的孩子
     async setCurrentChild(openid, childId) {
         const sql = 'UPDATE users SET current_child_id = ? WHERE openid = ?';
-        const [result] = await this.connection.query(sql, [childId, openid]);
+        const [result] = await this.pool.query(sql, [childId, openid]);
         return result.affectedRows;
     }
 
@@ -546,7 +560,7 @@ class Database {
             ORDER BY COALESCE(taken_at, created_at) DESC
             LIMIT ? OFFSET ?
         `;
-        const [photos] = await this.connection.query(sql, [childId, limit, offset]);
+        const [photos] = await this.pool.query(sql, [childId, limit, offset]);
         return photos;
     }
 
@@ -557,9 +571,9 @@ class Database {
         // 获取或创建用户
         let userId = user_id;
         if (openid && !userId) {
-            const [users] = await this.connection.query('SELECT id FROM users WHERE openid = ?', [openid]);
+            const [users] = await this.pool.query('SELECT id FROM users WHERE openid = ?', [openid]);
             if (users.length === 0) {
-                const [result] = await this.connection.query('INSERT INTO users (openid) VALUES (?)', [openid]);
+                const [result] = await this.pool.query('INSERT INTO users (openid) VALUES (?)', [openid]);
                 userId = result.insertId;
             } else {
                 userId = users[0].id;
@@ -570,14 +584,14 @@ class Database {
             INSERT INTO album_photos (child_id, user_id, openid, url, description, qiniu_key, taken_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         `;
-        const [result] = await this.connection.query(sql, [child_id, userId, openid, url, description, qiniu_key, taken_at || null]);
+        const [result] = await this.pool.query(sql, [child_id, userId, openid, url, description, qiniu_key, taken_at || null]);
         return result.insertId;
     }
 
     // 删除相册照片
     async deleteAlbumPhoto(id) {
         const sql = 'DELETE FROM album_photos WHERE id = ?';
-        const [result] = await this.connection.query(sql, [id]);
+        const [result] = await this.pool.query(sql, [id]);
         return result.affectedRows;
     }
 

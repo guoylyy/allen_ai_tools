@@ -143,8 +143,8 @@ function handleLogout() {
 
     <!-- 版本信息 -->
     <div class="text-center py-8 text-sm text-muted">
-      <p>宝宝成长记录 v1.0.0</p>
-      <p class="mt-1">© 2024 All Rights Reserved</p>
+      <p>宝宝成长记录 v1.1.0</p>
+      <p class="mt-1">© 2026 All Rights Reserved</p>
     </div>
 
     <!-- 底部导航 -->

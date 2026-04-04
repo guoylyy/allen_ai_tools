@@ -88,7 +88,7 @@ class MessageHandler {
             // 获取用户信息
             let user;
             try {
-                const [users] = await db.connection.query(
+                const [users] = await db.pool.query(
                     'SELECT * FROM users WHERE openid = ?',
                     [openid]
                 );
@@ -102,7 +102,7 @@ class MessageHandler {
             if (user && user.current_child_id) {
                 childId = user.current_child_id;
             } else {
-                const [children] = await db.connection.query(
+                const [children] = await db.pool.query(
                     'SELECT id FROM children LIMIT 1'
                 );
                 if (children.length > 0) {
