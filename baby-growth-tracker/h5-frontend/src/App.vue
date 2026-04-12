@@ -30,7 +30,7 @@ function switchTab(path) {
 }
 
 // 要隐藏底部导航的页面
-const hideBottomNavPaths = ['/chat-record']
+const hideBottomNavPaths = ['/chat-record', '/login']
 const showBottomNav = computed(() => !hideBottomNavPaths.includes(route.path))
 </script>
 

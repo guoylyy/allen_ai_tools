@@ -242,6 +242,16 @@ function parseTime(text) {
         return { hour, minute };
     }
     
+    // 处理数字时间带冒号 "0:40" 或 "03:05" 
+    const colonMatch = text.match(/(\d{1,2}):(\d{2})/);
+    if (colonMatch) {
+        hour = parseInt(colonMatch[1]);
+        minute = parseInt(colonMatch[2]);
+        const isNight = hour >= 0 && hour <= 5;
+        console.log(`[parseTime] 识别到冒号时间: ${hour}:${minute}, isNight=${isNight}`);
+        return { hour, minute, isNight };
+    }
+    
     // 处理纯数字时间 "X点Y分" 或 "X点Y"
     const timeMatch = text.match(/(\d{1,2})点(\d+)/);
     if (timeMatch) {
