@@ -315,7 +315,6 @@ function validateAndCompleteResult(parsed, originalText) {
     }
 
     // 处理 value 和 amount
-    // 如果 AI 没有返回 value，尝试从 amount 中解析（如 "90ml" -> 90）
     if (!parsed.value && parsed.amount) {
         const amountMatch = parsed.amount.match(/(\d+)/);
         if (amountMatch) {
@@ -323,24 +322,25 @@ function validateAndCompleteResult(parsed, originalText) {
         }
     }
 
-    // 如果 value 存在，在 message 中体现
     const valueInfo = parsed.value ? ` ${parsed.value}ml` : '';
 
-    // 确保有消息
     if (!parsed.message) {
         const typeName = RECORD_TYPES[parsed.type]?.name || '记录';
         parsed.message = `${typeName}已记录${valueInfo}`;
     } else if (parsed.value && !parsed.message.includes(valueInfo)) {
-        // 如果消息中还没有包含量信息，添加到消息末尾
         parsed.message = parsed.message + valueInfo;
     }
 
-    // 首先执行本地时间解析（作为参考）
+    // 首先执行本地时间解析
     const dateInfo = parseRelativeDate(originalText);
-    const localTimeInfo = parseTime(dateInfo.remainingText);
+    const localTimeInfo = parseTime(originalText);  // 传入原始文本，不要用remainingText
     
-    console.log(`[验证结果] 本地解析时间:`, localTimeInfo);
+    console.log(`[验证结果] ====== 时间解析调试 ======`);
+    console.log(`[验证结果] 原始文本: "${originalText}"`);
     console.log(`[验证结果] 相对日期:`, dateInfo);
+    console.log(`[验证结果] 本地解析时间:`, localTimeInfo);
+    console.log(`[验证结果] AI 返回 recorded_at:`, parsed.recorded_at);
+    console.log(`[验证结果] ==========================`);
 
     // 优先使用本地解析的时间（更可靠）
     // 只有在没有识别到具体时间时才使用 AI 返回的时间
