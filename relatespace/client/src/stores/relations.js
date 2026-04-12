@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { relationsAPI } from '../api'
+import { relationsAPI, eventsAPI, momentsAPI, financeAPI } from '../api'
 
 export const useRelationStore = defineStore('relations', {
   state: () => ({
@@ -81,6 +81,59 @@ export const useRelationStore = defineStore('relations', {
         const res = await relationsAPI.delete(id)
         if (res.data.success) {
           await this.fetchRelations()
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+    
+    async addEvent(relationId, data) {
+      try {
+        const res = await eventsAPI.create({ relationId, ...data })
+        if (res.data.success) {
+          await this.fetchRelation(relationId)
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+    
+    async addMoment(relationId, data) {
+      try {
+        const res = await momentsAPI.create({ relationId, ...data })
+        if (res.data.success) {
+          await this.fetchRelation(relationId)
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+    
+    async addFinance(relationId, data) {
+      try {
+        const res = await financeAPI.create({ relationId, ...data })
+        if (res.data.success) {
+          await this.fetchRelation(relationId)
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+    
+    async addInteraction(relationId, data) {
+      try {
+        // 生成 AI 摘要
+        const relation = this.relations.find(r => r.id === relationId)
+        const summaryRes = await interactionsAPI.generateSummary({
+          content: data.content,
+          relationName: relation?.name,
+          relationContext: relation?.background
+        })
+        const summary = summaryRes.data.success ? summaryRes.data.data.summary : ''
+        
+        const res = await interactionsAPI.create({ relationId, ...data, summary })
+        if (res.data.success) {
+          await this.fetchRelation(relationId)
         }
       } catch (err) {
         this.error = err.message

@@ -1,0 +1,26 @@
+
+> relatespace-server@1.0.0 start
+> node index.js
+
+
+╔═══════════════════════════════════════════════════╗
+║                                                   ║
+║     关系舱 RelateSpace API 服务                    ║
+║     服务端口: 3003                                ║
+║     前端页面: http://localhost:3003              ║
+║                                                   ║
+╚═══════════════════════════════════════════════════╝
+  
+✅ 数据库初始化完成
+Creating interaction: {
+  relationId: '12d82d68-10a5-4230-b58b-af72645809f1',
+  type: 'meeting',
+  content: '今天讨论AI合作',
+  summary: undefined
+}
+Creating interaction: {
+  relationId: '12d82d68-10a5-4230-b58b-af72645809f1',
+  type: 'meeting',
+  content: '和王建国讨论AI项目，他很感兴趣',
+  summary: '😊 与王建国讨论AI项目，对方表示感兴趣'
+}

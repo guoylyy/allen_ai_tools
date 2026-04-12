@@ -20,7 +20,8 @@ export const interactionsAPI = {
   getByRelation: (relationId) => api.get(`/interactions/relation/${relationId}`),
   create: (data) => api.post('/interactions', data),
   update: (id, data) => api.put(`/interactions/${id}`, data),
-  delete: (id) => api.delete(`/interactions/${id}`)
+  delete: (id) => api.delete(`/interactions/${id}`),
+  generateSummary: (data) => api.post('/interactions/ai-summary', data)
 }
 
 // 财务API

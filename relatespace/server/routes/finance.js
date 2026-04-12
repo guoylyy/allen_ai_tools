@@ -1,15 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const { db, uuidv4 } = require('../models/database');
+const { getDb, uuidv4, saveDatabase } = require('../models/database');
 
 // 获取某关系人的财务记录
-router.get('/relation/:relationId', (req, res) => {
+router.get('/relation/:relationId', async (req, res) => {
   try {
-    const finance = db.prepare(`
+    const db = await getDb();
+    const stmt = db.prepare(`
       SELECT * FROM finance 
       WHERE relationId = ? 
       ORDER BY date DESC
-    `).all(req.params.relationId);
+    `);
+    stmt.bind([req.params.relationId]);
+    
+    const finance = [];
+    while (stmt.step()) {
+      finance.push(stmt.getAsObject());
+    }
+    stmt.free();
     
     res.json({ success: true, data: finance });
   } catch (error) {
@@ -18,17 +26,27 @@ router.get('/relation/:relationId', (req, res) => {
 });
 
 // 获取统计信息
-router.get('/stats/:relationId', (req, res) => {
+router.get('/stats/:relationId', async (req, res) => {
   try {
-    const income = db.prepare(`
+    const db = await getDb();
+    
+    const incomeStmt = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM finance 
       WHERE relationId = ? AND type = 'income'
-    `).get(req.params.relationId);
+    `);
+    incomeStmt.bind([req.params.relationId]);
+    incomeStmt.step();
+    const income = incomeStmt.getAsObject();
+    incomeStmt.free();
     
-    const expense = db.prepare(`
+    const expenseStmt = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) as total FROM finance 
       WHERE relationId = ? AND type = 'expense'
-    `).get(req.params.relationId);
+    `);
+    expenseStmt.bind([req.params.relationId]);
+    expenseStmt.step();
+    const expense = expenseStmt.getAsObject();
+    expenseStmt.free();
     
     res.json({
       success: true,
@@ -44,32 +62,42 @@ router.get('/stats/:relationId', (req, res) => {
 });
 
 // 创建财务记录
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
+    const db = await getDb();
     const { relationId, type, amount, item, category, date, note } = req.body;
     const id = uuidv4();
+    console.log('Creating finance:', { relationId, type, amount, item, category, date, note });
     
-    db.prepare(`
+    const stmt = db.prepare(`
       INSERT INTO finance (id, relationId, type, amount, item, category, date, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, relationId, type, amount, item, category || 'gift', date, note);
-    
+    `);
+    stmt.run([id, relationId, type, Number(amount), item, category || 'gift', date, note || null]);
+    stmt.free();
+
+    saveDatabase();
     res.json({ success: true, data: { id } });
   } catch (error) {
+    console.error('Finance error:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
 
 // 更新财务记录
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
+    const db = await getDb();
     const { type, amount, item, category, date, note } = req.body;
     
-    db.prepare(`
+    const stmt = db.prepare(`
       UPDATE finance SET type = ?, amount = ?, item = ?, category = ?, date = ?, note = ?
       WHERE id = ?
-    `).run(type, amount, item, category, date, note, req.params.id);
+    `);
+    stmt.run([type, amount, item, category, date, note, req.params.id]);
+    stmt.free();
     
+    saveDatabase();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -77,9 +105,14 @@ router.put('/:id', (req, res) => {
 });
 
 // 删除财务记录
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
-    db.prepare('DELETE FROM finance WHERE id = ?').run(req.params.id);
+    const db = await getDb();
+    const stmt = db.prepare('DELETE FROM finance WHERE id = ?');
+    stmt.run([req.params.id]);
+    stmt.free();
+    
+    saveDatabase();
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
