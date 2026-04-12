@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -28,14 +28,18 @@ watch(() => route.path, (newPath) => {
 function switchTab(path) {
   router.push(path)
 }
+
+// 要隐藏底部导航的页面
+const hideBottomNavPaths = ['/chat-record']
+const showBottomNav = computed(() => !hideBottomNavPaths.includes(route.path))
 </script>
 
 <template>
-  <div class="min-h-screen pb-16">
+  <div class="min-h-screen" :class="showBottomNav ? 'pb-16' : ''">
     <router-view />
     
     <!-- 底部导航 -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <nav v-if="showBottomNav" class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
       <div class="flex justify-around py-2">
         <button 
           v-for="tab in tabs" 
