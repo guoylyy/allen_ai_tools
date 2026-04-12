@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 
-const PORT = process.env.PORT || 3007;
+const PORT = process.env.PORT || 3002;
 
 async function startServer() {
   // 初始化数据库
