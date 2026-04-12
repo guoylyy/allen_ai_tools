@@ -52,14 +52,15 @@ router.post('/', (req, res) => {
   try {
     const { relationId, type, amount, item, category, date, note } = req.body;
     const id = uuidv4();
-    
+
     db().prepare(`
       INSERT INTO finance (id, relationId, type, amount, item, category, date, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, relationId, type, amount, item, category || 'gift', date, note);
-    
+    `).run(id, relationId, type, amount, item, category || 'gift', date, note === undefined ? null : note);
+
     res.json({ success: true, data: { id } });
   } catch (error) {
+    console.error('[Finance POST] 错误:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
