@@ -2,16 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 基础样式 */
+/* Airbnb Design System */
 :root {
-  --primary-color: #ee751b;
+  /* Rausch Red - Brand Accent */
+  --palette-bg-primary-core: #ff385c;
+  --palette-bg-tertiary-core: #e00b41;
+  --palette-text-primary-error: #c13515;
+  
+  /* Text Scale - Warm, not cold */
+  --palette-text-primary: #222222;
+  --palette-text-focused: #3f3f3f;
+  --palette-text-secondary: #6a6a6a;
+  --palette-text-material-disabled: rgba(0,0,0,0.24);
+  
+  /* Surfaces */
+  --palette-bg-surface: #ffffff;
+  --palette-bg-surface-secondary: #f2f2f2;
+  --palette-border: #c1c1c1;
+  
+  /* Legacy aliases */
+  --primary-color: #ff385c;
   --secondary-color: #0ea5e9;
-  --text-primary: #333333;
-  --text-secondary: #666666;
-  --text-light: #999999;
-  --bg-page: #f5f5f5;
+  --text-primary: #222222;
+  --text-secondary: #6a6a6a;
+  --text-light: #929292;
+  --bg-page: #ffffff;
   --bg-card: #ffffff;
-  --border-color: #e5e5e5;
+  --border-color: #c1c1c1;
+}
+
+/* Airbnb Three-Layer Card Shadow */
+.shadow-card {
+  box-shadow: 
+    rgba(0,0,0,0.02) 0px 0px 0px 1px,
+    rgba(0,0,0,0.04) 0px 2px 6px,
+    rgba(0,0,0,0.1) 0px 4px 8px;
+}
+
+.shadow-hover {
+  box-shadow: rgba(0,0,0,0.08) 0px 4px 12px;
 }
 
 * {
@@ -36,42 +65,33 @@ html, body {
   }
 }
 
-/* 常用工具类 */
-.container {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.card {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
+/* Buttons - Airbnb Style */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.75rem 1.5rem;
+  padding: 0px 24px;
+  height: 48px;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   border: none;
   outline: none;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #ee751b 0%, #df5b11 100%);
+  background: #222222;
   color: white;
+}
+
+.btn-primary:hover {
+  background: var(--palette-bg-primary-core);
 }
 
 .btn-primary:active {
   transform: scale(0.98);
-  opacity: 0.9;
 }
 
 .btn-secondary {
@@ -94,6 +114,22 @@ html, body {
   padding: 0;
   border-radius: 50%;
 }
+
+/* Card - Airbnb Style */
+.card {
+  background: var(--bg-card);
+  border-radius: 20px;
+  padding: 1rem;
+  box-shadow: 
+    rgba(0,0,0,0.02) 0px 0px 0px 1px,
+    rgba(0,0,0,0.04) 0px 2px 6px,
+    rgba(0,0,0,0.1) 0px 4px 8px;
+}
+
+/* Border Radius Scale */
+.rounded-badge { border-radius: 14px; }
+.rounded-card { border-radius: 20px; }
+.rounded-large { border-radius: 32px; }
 
 /* 图标尺寸 */
 .icon-sm {

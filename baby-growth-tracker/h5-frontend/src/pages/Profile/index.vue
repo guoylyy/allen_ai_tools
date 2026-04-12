@@ -7,8 +7,6 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const menuItems = [
-  { id: 'children', name: '孩子管理', icon: '👶', right: '>' },
-  { id: 'about', name: '关于我们', icon: 'ℹ️', right: '>' }
 ]
 
 // 用户信息

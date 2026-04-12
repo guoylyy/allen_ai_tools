@@ -5,6 +5,9 @@ import { useUserStore } from '@/stores/user'
 import { api } from '@/api'
 import { formatDate, toLocalDate } from '@/utils'
 
+// 当前底部 tab
+const activeTab = ref('home')
+
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -65,10 +68,7 @@ const menuRecord = ref(null)
 // 类型筛选 Tab
 const filterTabs = ref([
   { id: 'all', name: '全部' },
-  { id: 'sleep', name: '睡觉' },
   { id: 'eat', name: '吃饭' },
-  { id: 'play', name: '玩耍' },
-  { id: 'study', name: '学习' },
   { id: 'supplement', name: '补剂' },
   { id: 'poop', name: '排便' },
   { id: 'pee', name: '排尿' }
@@ -86,13 +86,13 @@ const supplementOptions = [
 
 // 记录类型
 const recordTypes = [
-  { id: 'sleep', name: '睡觉', icon: '🌙', color: 'bg-purple-100 text-purple-600' },
-  { id: 'eat', name: '吃饭', icon: '🍼', color: 'bg-orange-100 text-orange-600' },
-  { id: 'play', name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
-  { id: 'study', name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
-  { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
-  { id: 'poop', name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' },
-  { id: 'pee', name: '排尿', icon: '💧', color: 'bg-cyan-100 text-cyan-600' }
+  { id: 'sleep', name: '睡觉', icon: '💤', color: 'bg-gray-100 text-gray-600' },
+  { id: 'eat', name: '吃饭', icon: '🍼', color: 'bg-gray-100 text-gray-600' },
+  { id: 'play', name: '玩耍', icon: '🧸', color: 'bg-gray-100 text-gray-600' },
+  { id: 'study', name: '学习', icon: '📖', color: 'bg-gray-100 text-gray-600' },
+  { id: 'supplement', name: '补剂', icon: '💊', color: 'bg-gray-100 text-gray-600' },
+  { id: 'poop', name: '排便', icon: '💩', color: 'bg-gray-100 text-gray-600' },
+  { id: 'pee', name: '排尿', icon: '💧', color: 'bg-gray-100 text-gray-600' }
 ]
 
 const currentRecordType = computed(() => 
@@ -387,14 +387,14 @@ async function submitRecord() {
 
 // 记录类型映射
 const typeMap = {
-  sleep: { name: '睡觉', icon: '🌙', color: 'bg-purple-100 text-purple-600' },
-  eat: { name: '吃饭', icon: '🍼', color: 'bg-orange-100 text-orange-600' },
-  play: { name: '玩耍', icon: '🧸', color: 'bg-blue-100 text-blue-600' },
-  study: { name: '学习', icon: '📚', color: 'bg-green-100 text-green-600' },
-  supplement: { name: '补剂', icon: '💊', color: 'bg-pink-100 text-pink-600' },
-  milestone: { name: '里程碑', icon: '🎉', color: 'bg-pink-100 text-pink-600' },
-  poop: { name: '排便', icon: '💩', color: 'bg-yellow-100 text-yellow-600' },
-  pee: { name: '排尿', icon: '💧', color: 'bg-cyan-100 text-cyan-600' }
+  sleep: { name: '睡觉', icon: '💤', color: 'bg-gray-100 text-gray-600' },
+  eat: { name: '吃饭', icon: '🍼', color: 'bg-gray-100 text-gray-600' },
+  play: { name: '玩耍', icon: '🧸', color: 'bg-gray-100 text-gray-600' },
+  study: { name: '学习', icon: '📖', color: 'bg-gray-100 text-gray-600' },
+  supplement: { name: '补剂', icon: '💊', color: 'bg-gray-100 text-gray-600' },
+  milestone: { name: '里程碑', icon: '⭐', color: 'bg-gray-100 text-gray-600' },
+  poop: { name: '排便', icon: '💩', color: 'bg-gray-100 text-gray-600' },
+  pee: { name: '排尿', icon: '💧', color: 'bg-gray-100 text-gray-600' }
 }
 
 // 需要开始结束时间的类型
@@ -842,31 +842,19 @@ onUnmounted(() => {
         <!-- 聊天记录 -->
         <button
           @click="router.push('/chat-record')"
-          class="p-4 bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl text-white flex items-center justify-between shadow-lg active:scale-98 transition-transform"
+          class="p-4 bg-white rounded-card shadow-card flex flex-col items-center gap-2 active:scale-98 transition-transform"
         >
-          <div class="flex items-center gap-2">
-            <span class="text-2xl">💬</span>
-            <div class="text-left">
-              <p class="font-semibold text-sm">聊天记录</p>
-              <p class="text-xs opacity-90">自然语言录入</p>
-            </div>
-          </div>
-          <span class="text-xl">→</span>
+          <span class="text-2xl">💬</span>
+          <p class="font-medium text-sm">聊天记录</p>
         </button>
         
         <!-- 手动录入 -->
         <button
           @click="openManualModal"
-          class="p-4 bg-gradient-to-r from-orange-400 to-orange-500 rounded-xl text-white flex items-center justify-between shadow-lg active:scale-98 transition-transform"
+          class="p-4 bg-white rounded-card shadow-card flex flex-col items-center gap-2 active:scale-98 transition-transform"
         >
-          <div class="flex items-center gap-2">
-            <span class="text-2xl">✏️</span>
-            <div class="text-left">
-              <p class="font-semibold text-sm">手动录入</p>
-              <p class="text-xs opacity-90">选择时间录入</p>
-            </div>
-          </div>
-          <span class="text-xl">→</span>
+          <span class="text-2xl">✏️</span>
+          <p class="font-medium text-sm">手动录入</p>
         </button>
       </div>
     </section>
@@ -990,28 +978,6 @@ onUnmounted(() => {
         </div>
       </div>
     </section>
-
-    <!-- 底部导航 -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
-      <div class="flex justify-around py-2">
-        <router-link to="/" class="flex flex-col items-center p-2 text-primary-500">
-          <span class="text-xl">🏠</span>
-          <span class="text-xs mt-1">首页</span>
-        </router-link>
-        <router-link to="/album" class="flex flex-col items-center p-2 text-gray-500">
-          <span class="text-xl">📸</span>
-          <span class="text-xs mt-1">相册</span>
-        </router-link>
-        <router-link to="/report" class="flex flex-col items-center p-2 text-gray-500">
-          <span class="text-xl">📊</span>
-          <span class="text-xs mt-1">报表</span>
-        </router-link>
-        <router-link to="/profile" class="flex flex-col items-center p-2 text-gray-500">
-          <span class="text-xl">👤</span>
-          <span class="text-xs mt-1">我的</span>
-        </router-link>
-      </div>
-    </nav>
 
     <!-- 记录操作菜单 -->
     <Teleport to="body">
