@@ -218,7 +218,7 @@ function parseTime(text) {
         if (nightMatch[2]) {
             minute = parseChineseNumber(nightMatch[2]) || 0;
         }
-        return { hour, minute, isNight: true };
+        return { hour, minute };
     }
     
     // 处理 "下午X点" 或 "晚上X点" (支持中文数字分钟)
@@ -247,9 +247,7 @@ function parseTime(text) {
     if (colonMatch) {
         hour = parseInt(colonMatch[1]);
         minute = parseInt(colonMatch[2]);
-        const isNight = hour >= 0 && hour <= 5;
-        console.log(`[parseTime] 识别到冒号时间: ${hour}:${minute}, isNight=${isNight}`);
-        return { hour, minute, isNight };
+        return { hour, minute };
     }
     
     // 处理纯数字时间 "X点Y分" 或 "X点Y"
@@ -257,9 +255,7 @@ function parseTime(text) {
     if (timeMatch) {
         hour = parseInt(timeMatch[1]);
         minute = parseInt(timeMatch[2] || '0');
-        // 如果是0-5点，认为是凌晨/深夜，需要处理日期
-        const isNight = hour >= 0 && hour <= 5;
-        return { hour, minute, isNight };
+        return { hour, minute };
     }
     
     // 处理中文数字时间 "X点Y分" (如 "3点十分", "3点二十分", "3点半")
@@ -267,16 +263,14 @@ function parseTime(text) {
     if (chineseTimeMatch) {
         hour = parseInt(chineseTimeMatch[1]);
         minute = parseChineseNumber(chineseTimeMatch[2]) || 0;
-        const isNight = hour >= 0 && hour <= 5;
-        return { hour, minute, isNight };
+        return { hour, minute };
     }
     
     // 处理只有小时没有分钟的情况 "X点"
     const hourOnlyMatch = text.match(/(\d{1,2})点/);
     if (hourOnlyMatch) {
         hour = parseInt(hourOnlyMatch[1]);
-        const isNight = hour >= 0 && hour <= 5;
-        return { hour, minute: 0, isNight };
+        return { hour, minute: 0 };
     }
     
     return null;
@@ -407,14 +401,8 @@ function validateAndCompleteResult(parsed, originalText) {
     if (localTimeInfo) {
         targetDate.setHours(localTimeInfo.hour, localTimeInfo.minute, 0, 0);
         console.log(`[验证结果] 设置具体时间: ${localTimeInfo.hour}:${localTimeInfo.minute}`);
-        
-        // 如果是凌晨/深夜 (0-5点)，说明是前一天的事件
-        if (localTimeInfo.isNight || (localTimeInfo.hour >= 0 && localTimeInfo.hour <= 5)) {
-            targetDate.setDate(targetDate.getDate() - 1);
-            console.log(`[验证结果] 凌晨时间，日期向前一天: ${targetDate.toISOString()}`);
-        }
     }
-    // 如果没有识别到具体时间，保持当前时间不变（不在这里设置为 new Date()）
+    // 如果没有识别到具体时间，保持当前时间不变
     
     // 强制使用当前年份
     targetDate.setFullYear(currentYear);
