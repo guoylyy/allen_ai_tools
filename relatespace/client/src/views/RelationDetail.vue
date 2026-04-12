@@ -134,7 +134,10 @@
       <div class="card-shadow rounded-lg p-5">
         <div class="text-sm font-semibold mb-4 flex items-center justify-between">
           <span class="flex items-center gap-2"><i class="fas fa-history text-gray-400"></i> 互动历史</span>
-          <span class="text-xs text-gray-400">{{ relation.interactions?.length || 0 }}次</span>
+          <span class="flex items-center gap-2">
+            <span class="text-xs text-gray-400">{{ relation.interactions?.length || 0 }}次</span>
+            <button @click="showInteractionModal = true" class="text-xs text-blue-600">+ 添加</button>
+          </span>
         </div>
         <div class="space-y-4">
           <div v-for="interaction in relation.interactions" :key="interaction.id" class="timeline-item">
@@ -158,6 +161,99 @@
     <div v-else class="flex items-center justify-center h-64">
       <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
     </div>
+
+    <!-- 重要时刻弹窗 -->
+    <Modal :show="showEventModal" title="添加重要时刻" @close="showEventModal = false">
+      <form @submit.prevent="handleAddEvent" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+          <select v-model="eventForm.type" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            <option value="birthday">生日</option>
+            <option value="anniversary">纪念日</option>
+            <option value="meeting">约会</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+          <input v-model="eventForm.date" type="date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+          <input v-model="eventForm.note" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div class="flex items-center gap-2">
+          <input v-model="eventForm.reminder" type="checkbox" id="reminder" class="w-4 h-4">
+          <label for="reminder" class="text-sm text-gray-600">提前提醒</label>
+        </div>
+        <button type="submit" class="w-full btn-primary">保存</button>
+      </form>
+    </Modal>
+
+    <!-- 朋友圈动态弹窗 -->
+    <Modal :show="showMomentModal" title="添加朋友圈动态" @close="showMomentModal = false">
+      <form @submit.prevent="handleAddMoment" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">内容</label>
+          <textarea v-model="momentForm.content" required rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+          <input v-model="momentForm.date" type="date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <button type="submit" class="w-full btn-primary">保存</button>
+      </form>
+    </Modal>
+
+    <!-- 财务往来弹窗 -->
+    <Modal :show="showFinanceModal" title="记录财务往来" @close="showFinanceModal = false">
+      <form @submit.prevent="handleAddFinance" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+          <select v-model="financeForm.type" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            <option value="expense">我方投入</option>
+            <option value="income">对方投入</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">金额</label>
+          <input v-model.number="financeForm.amount" type="number" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">事项</label>
+          <input v-model="financeForm.item" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+          <input v-model="financeForm.date" type="date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <button type="submit" class="w-full btn-primary">保存</button>
+      </form>
+    </Modal>
+
+    <!-- 互动记录弹窗 -->
+    <Modal :show="showInteractionModal" title="添加互动记录" @close="showInteractionModal = false">
+      <form @submit.prevent="handleAddInteraction" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">互动类型</label>
+          <select v-model="interactionForm.type" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            <option value="meeting">面谈</option>
+            <option value="phone">电话</option>
+            <option value="meal">商务餐</option>
+            <option value="event">活动</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">内容 *</label>
+          <textarea v-model="interactionForm.content" required rows="4" placeholder="记录互动内容，AI会自动生成摘要" class="w-full px-3 py-2 border border-gray-300 rounded-lg"></textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">日期</label>
+          <input v-model="interactionForm.date" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+        </div>
+        <button type="submit" class="w-full btn-primary">保存</button>
+      </form>
+    </Modal>
   </div>
 </template>
 
@@ -165,6 +261,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useRelationStore } from '../stores/relations'
+import Modal from '../components/Modal.vue'
 
 const route = useRoute()
 const store = useRelationStore()
@@ -174,6 +271,38 @@ const relation = computed(() => store.currentRelation)
 const showEventModal = ref(false)
 const showMomentModal = ref(false)
 const showFinanceModal = ref(false)
+
+// 表单数据
+const eventForm = ref({ type: 'birthday', date: '', note: '', reminder: false })
+const momentForm = ref({ content: '', date: '' })
+const financeForm = ref({ type: 'expense', amount: 0, item: '', date: '' })
+const interactionForm = ref({ type: 'meeting', content: '', date: '' })
+const showInteractionModal = ref(false)
+
+// 处理函数
+async function handleAddEvent() {
+  await store.addEvent(id.value, eventForm.value)
+  showEventModal.value = false
+  eventForm.value = { type: 'birthday', date: '', note: '', reminder: false }
+}
+
+async function handleAddMoment() {
+  await store.addMoment(id.value, momentForm.value)
+  showMomentModal.value = false
+  momentForm.value = { content: '', date: '' }
+}
+
+async function handleAddFinance() {
+  await store.addFinance(id.value, financeForm.value)
+  showFinanceModal.value = false
+  financeForm.value = { type: 'expense', amount: 0, item: '', date: '' }
+}
+
+async function handleAddInteraction() {
+  await store.addInteraction(id.value, interactionForm.value)
+  showInteractionModal.value = false
+  interactionForm.value = { type: 'meeting', content: '', date: '' }
+}
 
 const financeStats = computed(() => {
   if (!relation.value?.finance) return { totalIncome: 0, totalExpense: 0 }
