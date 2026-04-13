@@ -67,7 +67,10 @@
           <button @click="showEventModal = true" class="text-xs text-amber-700 bg-white/60 px-2 py-1 rounded">+ 添加</button>
         </div>
         <div class="grid grid-cols-2 gap-3">
-          <div v-for="event in relation.events" :key="event.id" class="bg-white/80 rounded-lg p-3">
+          <div v-for="event in relation.events" :key="event.id" class="bg-white/80 rounded-lg p-3 relative">
+            <button @click="deleteEvent(event.id)" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs">
+              <i class="fas fa-times"></i>
+            </button>
             <div class="text-2xl font-bold text-amber-700">{{ formatMonthDay(event.date) }}</div>
             <div class="text-xs text-amber-600">{{ getEventTypeName(event.type) }}</div>
             <div class="text-xs text-gray-500 mt-1">{{ event.note }}</div>
@@ -85,7 +88,10 @@
           <button @click="showMomentModal = true" class="text-xs text-blue-600">+ 添加动态</button>
         </div>
         <div class="space-y-3">
-          <div v-for="moment in relation.moments" :key="moment.id" class="moment-card">
+          <div v-for="moment in relation.moments" :key="moment.id" class="moment-card relative">
+            <button @click="deleteMoment(moment.id)" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 p-1">
+              <i class="fas fa-times"></i>
+            </button>
             <div class="content">{{ moment.content }}</div>
             <div class="flex items-center gap-3 meta">
               <span v-if="moment.photos?.length"><i class="fas fa-image mr-1"></i> {{ moment.photos.length }}张照片</span>
@@ -117,15 +123,20 @@
           </div>
         </div>
         <div class="space-y-2">
-          <div v-for="item in relation.finance?.slice(0, 4)" :key="item.id" 
+          <div v-for="item in relation.finance?.slice(0, 4)" :key="item.id"
                class="finance-item" :class="item.type">
             <div class="flex justify-between items-center">
               <div>
                 <div class="text-sm font-medium">{{ item.item }}</div>
                 <div class="text-xs text-gray-500">{{ item.note || formatDate(item.date) }}</div>
               </div>
-              <div class="amount" :class="item.type === 'income' ? 'income' : 'expense'">
-                {{ item.type === 'income' ? '+' : '-' }}¥{{ item.amount.toLocaleString() }}
+              <div class="flex items-center gap-2">
+                <div class="amount" :class="item.type === 'income' ? 'income' : 'expense'">
+                  {{ item.type === 'income' ? '+' : '-' }}¥{{ item.amount.toLocaleString() }}
+                </div>
+                <button @click="deleteFinance(item.id)" class="text-gray-400 hover:text-red-500 text-xs">
+                  <i class="fas fa-trash"></i>
+                </button>
               </div>
             </div>
             <div class="text-xs text-gray-400 mt-1">{{ formatDate(item.date) }}</div>
@@ -538,6 +549,33 @@ async function saveEvent() {
     eventForm.note = ''
     store.fetchRelation(id.value)
   } catch (err) { alert('保存失败') }
+}
+
+// 删除朋友圈
+async function deleteMoment(momentId) {
+  if (!confirm('确定要删除这条动态吗？')) return
+  try {
+    await momentsAPI.delete(momentId)
+    store.fetchRelation(id.value)
+  } catch (err) { alert('删除失败') }
+}
+
+// 删除财务记录
+async function deleteFinance(financeId) {
+  if (!confirm('确定要删除这条财务记录吗？')) return
+  try {
+    await financeAPI.delete(financeId)
+    store.fetchRelation(id.value)
+  } catch (err) { alert('删除失败') }
+}
+
+// 删除重要时刻
+async function deleteEvent(eventId) {
+  if (!confirm('确定要删除这条重要时刻吗？')) return
+  try {
+    await eventsAPI.delete(eventId)
+    store.fetchRelation(id.value)
+  } catch (err) { alert('删除失败') }
 }
 
 // 操作

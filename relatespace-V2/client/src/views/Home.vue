@@ -10,7 +10,7 @@
           <h1 class="text-lg font-semibold">关系舱</h1>
         </div>
         <div class="flex items-center gap-3">
-          <button @click="showChat = true" class="btn-primary px-4 py-2 flex items-center gap-2 text-sm">
+          <button @click="router.push('/relation/new')" class="btn-primary px-4 py-2 flex items-center gap-2 text-sm">
             <i class="fas fa-plus"></i>
             <span>新增</span>
           </button>
@@ -149,8 +149,10 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useRelationStore } from '../stores/relations'
 
+const router = useRouter()
 const store = useRelationStore()
 const relations = computed(() => store.relations)
 const loading = computed(() => store.loading)
