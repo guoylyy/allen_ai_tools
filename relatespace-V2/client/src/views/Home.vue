@@ -9,7 +9,15 @@
           </div>
           <h1 class="text-lg font-semibold">关系舱</h1>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <button @click="router.push('/import')" class="btn-secondary px-3 py-2 flex items-center gap-1 text-sm">
+            <i class="fas fa-file-import"></i>
+            <span class="hidden sm:inline">导入</span>
+          </button>
+          <button @click="handleExport" class="btn-secondary px-3 py-2 flex items-center gap-1 text-sm">
+            <i class="fas fa-file-export"></i>
+            <span class="hidden sm:inline">导出</span>
+          </button>
           <button @click="router.push('/relation/new')" class="btn-primary px-4 py-2 flex items-center gap-2 text-sm">
             <i class="fas fa-plus"></i>
             <span>新增</span>
@@ -60,6 +68,33 @@
         <button @click="filterType = 'highvalue'" class="tag" :class="{ 'bg-gray-900 text-white': filterType === 'highvalue' }">
           高价值
         </button>
+        <button @click="toggleSchoolFilter" class="tag" :class="{ 'bg-gray-900 text-white': filterType === 'school' }">
+          <i class="fas fa-graduation-cap mr-1"></i> 学校筛选
+        </button>
+      </div>
+
+      <!-- 学校筛选下拉 -->
+      <div v-if="filterType === 'school'" class="mb-4 p-4 bg-gray-50 rounded-lg">
+        <div class="flex gap-2 flex-wrap mb-3">
+          <select v-model="selectedSchoolId" @change="applySchoolFilter" class="form-input flex-1 min-w-[200px]">
+            <option value="">选择学校...</option>
+            <option v-for="school in allSchools" :key="school.id" :value="school.id">
+              {{ school.name }}
+            </option>
+          </select>
+          <button @click="clearSchoolFilter" class="btn-secondary px-3 py-2">
+            清除筛选
+          </button>
+        </div>
+        <div v-if="selectedSchoolId" class="text-sm text-gray-600">
+          <span>当前筛选: <strong>{{ selectedSchoolName }}</strong></span>
+          <router-link :to="`/school/${selectedSchoolId}`" class="ml-3 text-blue-600 hover:underline">
+            查看校友页面 <i class="fas fa-external-link-alt text-xs"></i>
+          </router-link>
+        </div>
+        <div v-if="schoolFilterResults.length > 0" class="mt-3 text-sm">
+          <span class="text-blue-600">找到 {{ schoolFilterResults.length }} 位校友</span>
+        </div>
       </div>
 
       <!-- 关系人网格 -->
@@ -151,15 +186,19 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRelationStore } from '../stores/relations'
+import { importAPI } from '../api'
 
 const router = useRouter()
 const store = useRelationStore()
 const relations = computed(() => store.relations)
 const loading = computed(() => store.loading)
+const allSchools = computed(() => store.allSchools)
 
 const filterType = ref('all')
 const showChat = ref(false)
 const chatInput = ref('')
+const selectedSchoolId = ref('')
+const schoolFilterResults = ref([])
 const chatMessages = ref([{
   type: 'bot',
   text: `<p>👋 您好！我是您的关系管理助手。</p>
@@ -181,7 +220,13 @@ const filteredRelations = computed(() => {
   if (filterType.value === 'promise') return relations.value.filter(r => r.interactionCount > 0)
   if (filterType.value === 'important') return relations.value.filter(r => r.importance === 'high')
   if (filterType.value === 'highvalue') return relations.value.filter(r => r.importance === 'high')
+  if (filterType.value === 'school') return schoolFilterResults.value
   return relations.value
+})
+
+const selectedSchoolName = computed(() => {
+  const school = allSchools.value.find(s => s.id === selectedSchoolId.value)
+  return school ? school.name : ''
 })
 
 const avatarColors = [
@@ -328,26 +373,71 @@ function extractInfo(msg) {
     duration: '未提及',
     promise: null
   }
-  
+
   if (msg.indexOf('今天') !== -1) info.date = '今天'
   if (msg.indexOf('昨天') !== -1) info.date = '昨天'
-  
+
   const d = msg.match(/(\d+)\s*小时/)
   if (d) info.duration = d[1] + '小时'
-  
+
   if (msg.indexOf('吃饭') !== -1) info.type = '商务餐'
   if (msg.indexOf('电话') !== -1) info.type = '电话'
-  
+
   if (msg.indexOf('答应') !== -1 || msg.indexOf('承诺') !== -1) {
     const m = msg.match(/答应(.+)/)
     if (m) info.promise = m[0]
   }
-  
+
   return info
+}
+
+function toggleSchoolFilter() {
+  if (filterType.value === 'school') {
+    filterType.value = 'all'
+  } else {
+    filterType.value = 'school'
+    if (allSchools.value.length === 0) {
+      store.fetchAllSchools()
+    }
+  }
+}
+
+async function applySchoolFilter() {
+  if (!selectedSchoolId.value) {
+    schoolFilterResults.value = []
+    return
+  }
+  const school = allSchools.value.find(s => s.id === selectedSchoolId.value)
+  if (school) {
+    schoolFilterResults.value = await store.searchBySchool(school.name)
+  }
+}
+
+function clearSchoolFilter() {
+  selectedSchoolId.value = ''
+  schoolFilterResults.value = []
+}
+
+async function handleExport() {
+  try {
+    const response = await importAPI.export()
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `relatespace_relations_${new Date().toISOString().split('T')[0]}.xlsx`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    alert('导出失败: ' + err.message)
+  }
 }
 
 onMounted(() => {
   store.fetchRelations()
+  store.fetchAllSchools()
 })
 </script>
 
@@ -516,5 +606,18 @@ onMounted(() => {
 }
 @media (max-width: 640px) {
   .chat-fab { bottom: 16px; right: 16px; }
+}
+
+/* 表单输入 */
+.form-input {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  background: white;
+}
+.form-input:focus {
+  border-color: #667eea;
 }
 </style>

@@ -49,4 +49,51 @@ export const eventsAPI = {
   delete: (id) => api.delete(`/events/${id}`)
 }
 
+// 学校API
+export const schoolsAPI = {
+  getAll: (params) => api.get('/schools', { params }),
+  create: (data) => api.post('/schools', data),
+  getByRelation: (relationId) => api.get(`/schools/relation/${relationId}`),
+  addToRelation: (data) => api.post('/schools/relation', data),
+  deleteRelationSchool: (id) => api.delete(`/schools/relation/${id}`),
+  searchBySchool: (schoolName) => api.get(`/schools/search/${encodeURIComponent(schoolName)}`),
+  getSchoolDetail: (schoolId) => api.get(`/schools/${schoolId}`)
+}
+
+// 导入导出API
+export const importAPI = {
+  // 获取导入模板
+  getTemplate: () => {
+    return axios({
+      url: '/api/import/template',
+      method: 'GET',
+      responseType: 'blob'
+    })
+  },
+  // 预览导入数据
+  preview: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/import/preview', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  // 执行导入
+  execute: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/import/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+  // 导出关系人
+  export: () => {
+    return axios({
+      url: '/api/import/export',
+      method: 'GET',
+      responseType: 'blob'
+    })
+  }
+}
+
 export default api

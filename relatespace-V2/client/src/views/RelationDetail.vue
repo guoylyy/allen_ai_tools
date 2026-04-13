@@ -44,6 +44,42 @@
         </div>
       </div>
 
+      <!-- 教育经历 -->
+      <div class="card-shadow rounded-xl p-5 mb-4">
+        <div class="text-sm font-semibold mb-3 flex items-center justify-between">
+          <span class="flex items-center gap-2"><i class="fas fa-graduation-cap text-gray-400"></i> 教育经历</span>
+          <button @click="showEducationModal = true" class="text-xs text-blue-600">+ 添加</button>
+        </div>
+        <div class="space-y-3">
+          <div v-for="edu in relationSchools" :key="edu.id" class="education-item">
+            <div class="flex items-start justify-between">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-university text-blue-600"></i>
+                </div>
+                <div>
+                  <div class="font-medium text-sm">{{ edu.schoolName }}</div>
+                  <div class="text-xs text-gray-500">
+                    {{ getDegreeName(edu.degree) }}
+                    <span v-if="edu.major"> · {{ edu.major }}</span>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-1">
+                    {{ edu.startYear || '?' }} - {{ edu.endYear || '?' }}
+                    <span v-if="edu.isPrimary" class="ml-2 text-blue-500">主学历</span>
+                  </div>
+                </div>
+              </div>
+              <button @click="deleteEducation(edu.id)" class="text-gray-400 hover:text-red-500 p-1">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+          </div>
+          <div v-if="!relationSchools.length" class="text-center text-xs text-gray-400 py-4">
+            暂无教育经历
+          </div>
+        </div>
+      </div>
+
       <!-- 约定提醒 -->
       <div class="promise-card mb-4">
         <div class="promise-title">
@@ -393,6 +429,59 @@
         </div>
       </div>
     </div>
+
+    <!-- 添加教育经历弹窗 -->
+    <div v-if="showEducationModal" class="modal-overlay show" @click.self="showEducationModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="font-semibold">添加教育经历</h3>
+          <button @click="showEducationModal = false" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">学校名称</label>
+            <input type="text" v-model="educationForm.schoolName" class="form-input" placeholder="输入学校名称">
+          </div>
+          <div class="form-group">
+            <label class="form-label">学历</label>
+            <select v-model="educationForm.degree" class="form-input">
+              <option value="">请选择</option>
+              <option value="highSchool">高中</option>
+              <option value="bachelor">本科</option>
+              <option value="master">硕士</option>
+              <option value="doctoral">博士</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">专业</label>
+            <input type="text" v-model="educationForm.major" class="form-input" placeholder="输入专业（选填）">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="form-group">
+              <label class="form-label">入学年份</label>
+              <input type="number" v-model="educationForm.startYear" class="form-input" placeholder="2010">
+            </div>
+            <div class="form-group">
+              <label class="form-label">毕业年份</label>
+              <input type="number" v-model="educationForm.endYear" class="form-input" placeholder="2014">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" v-model="educationForm.isPrimary" class="w-4 h-4">
+              <span class="text-sm">设为主学历</span>
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showEducationModal = false" class="flex-1 py-2 border rounded-lg text-gray-600">取消</button>
+          <button @click="saveEducation" class="flex-1 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -408,12 +497,14 @@ const store = useRelationStore()
 
 const id = computed(() => route.params.id)
 const relation = computed(() => store.currentRelation)
+const relationSchools = computed(() => store.currentRelationSchools)
 
 // 弹窗状态
 const showChat = ref(false)
 const showMomentModal = ref(false)
 const showFinanceModal = ref(false)
 const showEventModal = ref(false)
+const showEducationModal = ref(false)
 
 // 聊天
 const chatInput = ref('')
@@ -425,6 +516,7 @@ const chatMessages = ref([
 const momentForm = reactive({ content: '', date: new Date().toISOString().split('T')[0] })
 const financeForm = reactive({ type: 'expense', amount: '', item: '', category: 'gift' })
 const eventForm = reactive({ type: 'birthday', date: '', note: '' })
+const educationForm = reactive({ schoolName: '', degree: '', major: '', startYear: '', endYear: '', isPrimary: false })
 
 // 财务统计
 const financeStats = computed(() => {
@@ -578,6 +670,52 @@ async function deleteEvent(eventId) {
   } catch (err) { alert('删除失败') }
 }
 
+// 保存教育经历
+async function saveEducation() {
+  if (!educationForm.schoolName) { alert('请输入学校名称'); return }
+  try {
+    await store.addRelationSchool({
+      relationId: id.value,
+      schoolName: educationForm.schoolName,
+      degree: educationForm.degree || null,
+      major: educationForm.major || null,
+      startYear: educationForm.startYear ? parseInt(educationForm.startYear) : null,
+      endYear: educationForm.endYear ? parseInt(educationForm.endYear) : null,
+      isPrimary: educationForm.isPrimary
+    })
+    showEducationModal.value = false
+    resetEducationForm()
+  } catch (err) { alert('保存失败') }
+}
+
+// 删除教育经历
+async function deleteEducation(educationId) {
+  if (!confirm('确定要删除这条教育经历吗？')) return
+  try {
+    await store.deleteRelationSchool(educationId, id.value)
+  } catch (err) { alert('删除失败') }
+}
+
+function resetEducationForm() {
+  educationForm.schoolName = ''
+  educationForm.degree = ''
+  educationForm.major = ''
+  educationForm.startYear = ''
+  educationForm.endYear = ''
+  educationForm.isPrimary = false
+}
+
+function getDegreeName(degree) {
+  const names = {
+    highSchool: '高中',
+    bachelor: '本科',
+    master: '硕士',
+    doctoral: '博士',
+    other: '其他'
+  }
+  return names[degree] || degree || '学历'
+}
+
 // 操作
 function toggleImportant() {
   store.updateRelation(id.value, { ...relation.value, importance: relation.value.importance === 'high' ? 'normal' : 'high' })
@@ -595,6 +733,7 @@ function handleDelete() {
 
 onMounted(() => {
   store.fetchRelation(id.value)
+  store.fetchRelationSchools(id.value)
 })
 </script>
 
@@ -888,5 +1027,13 @@ onMounted(() => {
   background: #667eea;
   color: white;
   border-color: #667eea;
+}
+
+/* 教育经历 */
+.education-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
 }
 </style>

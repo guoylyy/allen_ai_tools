@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
-import { relationsAPI } from '../api'
+import { relationsAPI, schoolsAPI } from '../api'
 
 export const useRelationStore = defineStore('relations', {
   state: () => ({
     relations: [],
     currentRelation: null,
+    currentRelationSchools: [],
+    allSchools: [],
     loading: false,
     error: null
   }),
@@ -84,6 +86,70 @@ export const useRelationStore = defineStore('relations', {
         }
       } catch (err) {
         this.error = err.message
+      }
+    },
+
+    // 获取所有学校
+    async fetchAllSchools(search = '') {
+      try {
+        const res = await schoolsAPI.getAll({ search })
+        if (res.data.success) {
+          this.allSchools = res.data.data
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+
+    // 获取关系人的教育经历
+    async fetchRelationSchools(relationId) {
+      try {
+        const res = await schoolsAPI.getByRelation(relationId)
+        if (res.data.success) {
+          this.currentRelationSchools = res.data.data
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+
+    // 添加教育经历
+    async addRelationSchool(data) {
+      try {
+        const res = await schoolsAPI.addToRelation(data)
+        if (res.data.success) {
+          await this.fetchRelationSchools(data.relationId)
+          await this.fetchAllSchools()
+          return res.data.data
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+
+    // 删除教育经历
+    async deleteRelationSchool(id, relationId) {
+      try {
+        const res = await schoolsAPI.deleteRelationSchool(id)
+        if (res.data.success) {
+          await this.fetchRelationSchools(relationId)
+        }
+      } catch (err) {
+        this.error = err.message
+      }
+    },
+
+    // 按学校名搜索校友
+    async searchBySchool(schoolName) {
+      try {
+        const res = await schoolsAPI.searchBySchool(schoolName)
+        if (res.data.success) {
+          return res.data.data
+        }
+        return []
+      } catch (err) {
+        this.error = err.message
+        return []
       }
     }
   }

@@ -107,7 +107,33 @@ async function initDatabase() {
       FOREIGN KEY (relationId) REFERENCES relations(id) ON DELETE CASCADE
     )
   `);
-  
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS schools (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT DEFAULT 'university',
+      location TEXT,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS relation_schools (
+      id TEXT PRIMARY KEY,
+      relationId TEXT NOT NULL,
+      schoolId TEXT NOT NULL,
+      degree TEXT,
+      major TEXT,
+      startYear INTEGER,
+      endYear INTEGER,
+      isPrimary INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (relationId) REFERENCES relations(id) ON DELETE CASCADE,
+      FOREIGN KEY (schoolId) REFERENCES schools(id) ON DELETE CASCADE
+    )
+  `);
+
   // 插入示例数据
   const result = db.exec('SELECT COUNT(*) as count FROM relations');
   const count = result.length > 0 ? result[0].values[0][0] : 0;
@@ -159,6 +185,58 @@ async function initDatabase() {
         [r.id, r.name, r.position, r.company, r.tags, r.importance, r.background, r.features, r.goals, r.lastInteraction]
       );
     });
+
+    // 添加示例学校数据
+    const schools = [
+      { id: uuidv4(), name: '清华大学', type: 'university', location: '北京' },
+      { id: uuidv4(), name: '同济大学', type: 'university', location: '上海' },
+      { id: uuidv4(), name: '复旦大学', type: 'university', location: '上海' }
+    ];
+
+    schools.forEach(s => {
+      db.run(
+        `INSERT INTO schools (id, name, type, location) VALUES (?, ?, ?, ?)`,
+        [s.id, s.name, s.type, s.location]
+      );
+    });
+
+    // 获取已插入的关系人ID（从已插入的数据中查找）
+    const insertedRelations = db.prepare('SELECT id, name FROM relations').all();
+    const insertedSchools = db.prepare('SELECT id, name FROM schools').all();
+
+    // 为关系人添加教育经历
+    const tsinghua = insertedSchools.find(s => s.name === '清华大学');
+    const tongji = insertedSchools.find(s => s.name === '同济大学');
+    const fudan = insertedSchools.find(s => s.name === '复旦大学');
+
+    if (tsinghua && fudan) {
+      // 王建国：清华本科、复旦硕士
+      const wang = insertedRelations.find(r => r.name === '王建国');
+      if (wang) {
+        db.run(
+          `INSERT INTO relation_schools (id, relationId, schoolId, degree, major, startYear, endYear, isPrimary)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuidv4(), wang.id, tsinghua.id, 'bachelor', '计算机科学与技术', 2000, 2004, 1]
+        );
+        db.run(
+          `INSERT INTO relation_schools (id, relationId, schoolId, degree, major, startYear, endYear, isPrimary)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuidv4(), wang.id, fudan.id, 'master', '软件工程', 2004, 2007, 0]
+        );
+      }
+    }
+
+    if (tongji) {
+      // 张明辉：同济本科
+      const zhang = insertedRelations.find(r => r.name === '张明辉');
+      if (zhang) {
+        db.run(
+          `INSERT INTO relation_schools (id, relationId, schoolId, degree, major, startYear, endYear, isPrimary)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [uuidv4(), zhang.id, tongji.id, 'bachelor', '工商管理', 1998, 2002, 1]
+        );
+      }
+    }
   }
   
   saveDatabase();

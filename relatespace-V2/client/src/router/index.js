@@ -20,6 +20,16 @@ const routes = [
     path: '/relation/edit/:id',
     name: 'EditRelation',
     component: () => import('../views/EditRelation.vue')
+  },
+  {
+    path: '/school/:schoolId',
+    name: 'SchoolAlumni',
+    component: () => import('../views/SchoolAlumni.vue')
+  },
+  {
+    path: '/import',
+    name: 'ImportRelations',
+    component: () => import('../views/ImportRelations.vue')
   }
 ]
 
