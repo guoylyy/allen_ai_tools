@@ -84,15 +84,21 @@
       <div class="promise-card mb-4">
         <div class="promise-title">
           <i class="fas fa-handshake"></i>
-          待履行约定
+          <span>待履行约定</span>
+          <button @click="showPromiseModal = true" class="ml-auto text-xs bg-white/60 px-2 py-0.5 rounded">+ 添加</button>
         </div>
-        <div class="promise-item done">
-          <input type="checkbox" checked>
+        <div v-for="promise in relation.promises" :key="promise.id" class="promise-item" :class="{ done: promise.completed }">
+          <input type="checkbox" v-model="promise.completed" @change="togglePromise(promise)">
           <div class="flex-1">
-            <label class="line-through text-gray-400">发送详细报价方案</label>
-            <div class="text-xs text-gray-400">约定于 2024-06-05</div>
+            <label :class="{ 'line-through text-gray-400': promise.completed }">{{ promise.text }}</label>
+            <div class="text-xs text-gray-400">约定于 {{ promise.dueDate || '待定' }}</div>
           </div>
-          <span class="text-xs text-green-600">已完成</span>
+          <button @click="deletePromise(promise.id)" class="text-gray-400 hover:text-red-500 text-xs ml-2">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div v-if="!relation.promises?.length" class="text-center text-xs text-amber-600 py-2">
+          暂无约定
         </div>
       </div>
 
@@ -214,7 +220,10 @@
               <span class="text-xs text-gray-400">共{{ relation.interactions?.length || 0 }}次</span>
             </div>
             <div class="space-y-4">
-              <div v-for="(interaction, index) in relation.interactions" :key="interaction.id" class="timeline-item">
+              <div v-for="(interaction, index) in relation.interactions" :key="interaction.id" class="timeline-item relative">
+                <button @click="deleteInteraction(interaction.id)" class="absolute top-0 right-0 text-gray-400 hover:text-red-500 p-1">
+                  <i class="fas fa-times text-xs"></i>
+                </button>
                 <div class="flex flex-wrap items-center gap-2 mb-2">
                   <span class="font-medium text-sm">{{ formatDate(interaction.createdAt) }} · {{ getInteractionTypeName(interaction.type) }}</span>
                   <span v-if="index === 0" class="text-xs px-2 py-0.5 bg-orange-100 text-orange-600 rounded">待跟进</span>
@@ -242,23 +251,6 @@
 
         <!-- 侧边栏 -->
         <div class="space-y-4">
-          <!-- 投入产出 -->
-          <div class="card-shadow rounded-lg p-5">
-            <div class="text-sm font-semibold mb-3 flex items-center gap-2">
-              <i class="fas fa-chart-line text-gray-400"></i> 投入产出
-            </div>
-            <div class="space-y-2 text-sm">
-              <div class="flex justify-between">
-                <span class="text-gray-500">投入</span>
-                <span class="text-red-500">3次商务餐 + 1次会议</span>
-              </div>
-              <div class="flex justify-between">
-                <span class="text-gray-500">收益</span>
-                <span class="text-green-600">行业情报 · 合作引荐</span>
-              </div>
-            </div>
-          </div>
-
           <!-- 操作 -->
           <div class="card-shadow rounded-lg p-5">
             <div class="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -482,6 +474,32 @@
         </div>
       </div>
     </div>
+
+    <!-- 添加约定弹窗 -->
+    <div v-if="showPromiseModal" class="modal-overlay show" @click.self="showPromiseModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="font-semibold">添加约定</h3>
+          <button @click="showPromiseModal = false" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">约定内容</label>
+            <textarea v-model="promiseForm.text" rows="3" class="form-input" placeholder="描述约定内容..."></textarea>
+          </div>
+          <div class="form-group">
+            <label class="form-label">约定日期</label>
+            <input type="date" v-model="promiseForm.dueDate" class="form-input">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button @click="showPromiseModal = false" class="flex-1 py-2 border rounded-lg text-gray-600">取消</button>
+          <button @click="savePromise" class="flex-1 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg">保存</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -489,7 +507,7 @@
 import { ref, computed, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRelationStore } from '../stores/relations'
-import { momentsAPI, financeAPI, eventsAPI, interactionsAPI } from '../api'
+import { momentsAPI, financeAPI, eventsAPI, interactionsAPI, promisesAPI } from '../api'
 
 const route = useRoute()
 const router = useRouter()
@@ -505,6 +523,7 @@ const showMomentModal = ref(false)
 const showFinanceModal = ref(false)
 const showEventModal = ref(false)
 const showEducationModal = ref(false)
+const showPromiseModal = ref(false)
 
 // 聊天
 const chatInput = ref('')
@@ -517,6 +536,7 @@ const momentForm = reactive({ content: '', date: new Date().toISOString().split(
 const financeForm = reactive({ type: 'expense', amount: '', item: '', category: 'gift' })
 const eventForm = reactive({ type: 'birthday', date: '', note: '' })
 const educationForm = reactive({ schoolName: '', degree: '', major: '', startYear: '', endYear: '', isPrimary: false })
+const promiseForm = reactive({ text: '', dueDate: '' })
 
 // 财务统计
 const financeStats = computed(() => {
@@ -696,6 +716,15 @@ async function deleteEducation(educationId) {
   } catch (err) { alert('删除失败') }
 }
 
+// 删除互动历史
+async function deleteInteraction(interactionId) {
+  if (!confirm('确定要删除这条互动记录吗？')) return
+  try {
+    await interactionsAPI.delete(interactionId)
+    store.fetchRelation(id.value)
+  } catch (err) { alert('删除失败') }
+}
+
 function resetEducationForm() {
   educationForm.schoolName = ''
   educationForm.degree = ''
@@ -714,6 +743,40 @@ function getDegreeName(degree) {
     other: '其他'
   }
   return names[degree] || degree || '学历'
+}
+
+// 保存约定
+async function savePromise() {
+  if (!promiseForm.text) { alert('请输入约定内容'); return }
+  try {
+    await promisesAPI.create({
+      relationId: id.value,
+      text: promiseForm.text,
+      dueDate: promiseForm.dueDate || null,
+      completed: false
+    })
+    showPromiseModal.value = false
+    promiseForm.text = ''
+    promiseForm.dueDate = ''
+    store.fetchRelation(id.value)
+  } catch (err) { alert('保存失败') }
+}
+
+// 删除约定
+async function deletePromise(promiseId) {
+  if (!confirm('确定要删除这条约定吗？')) return
+  try {
+    await promisesAPI.delete(promiseId)
+    store.fetchRelation(id.value)
+  } catch (err) { alert('删除失败') }
+}
+
+// 切换约定状态
+async function togglePromise(promise) {
+  try {
+    await promisesAPI.update(promise.id, { ...promise, completed: promise.completed })
+    store.fetchRelation(id.value)
+  } catch (err) { alert('更新失败') }
 }
 
 // 操作

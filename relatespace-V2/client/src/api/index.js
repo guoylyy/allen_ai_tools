@@ -49,6 +49,14 @@ export const eventsAPI = {
   delete: (id) => api.delete(`/events/${id}`)
 }
 
+// 约定API
+export const promisesAPI = {
+  getByRelation: (relationId) => api.get(`/promises/relation/${relationId}`),
+  create: (data) => api.post('/promises', data),
+  update: (id, data) => api.put(`/promises/${id}`, data),
+  delete: (id) => api.delete(`/promises/${id}`)
+}
+
 // 学校API
 export const schoolsAPI = {
   getAll: (params) => api.get('/schools', { params }),
